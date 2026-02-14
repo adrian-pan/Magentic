@@ -1,0 +1,15 @@
+(node:74608) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+🧲 Magentic Backend running on http://localhost:3001
+   API endpoints:
+   POST /api/chat          — Chat with the AI agent
+   POST /api/files/upload        — Upload file (Supabase)
+   GET  /api/files               — List uploaded files
+   POST /api/functions/separate-stems    — Stem separation
+   POST /api/functions/transcribe-to-midi — Audio to MIDI
+   POST /api/execute        — Execute code in REAPER
+   GET  /api/reaper/status  — REAPER connection status
+   GET  /api/reaper/analyze — Analyze REAPER project
+   GET  /api/health         — Health check
+
