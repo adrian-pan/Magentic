@@ -1,7 +1,7 @@
 const express = require('express');
 const OpenAI = require('openai');
 const { SYSTEM_PROMPT } = require('../agent/systemPrompt');
-const { wantsExecution, runOrchestrator } = require('../services/orchestrator');
+const { TOOL_SCHEMAS, TOOL_DISPATCH } = require('../agent/tools');
 
 const router = express.Router();
 
@@ -12,14 +12,15 @@ async function getProjectState() {
     try {
         const response = await fetch(`${BRIDGE_URL}/analyze`);
         const data = await response.json();
-        if (data.success) {
-            return data;
-        }
+        if (data.success) return data;
         return null;
     } catch {
         return null;
     }
 }
+
+// Max tool-call rounds to prevent infinite loops
+const MAX_TOOL_ROUNDS = 10;
 
 // POST /api/chat
 router.post('/', async (req, res) => {
@@ -31,63 +32,8 @@ router.post('/', async (req, res) => {
         }
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const lastMessage = messages[messages.length - 1];
-        const userText = typeof lastMessage?.content === 'string' ? lastMessage.content : '';
 
-        // Execute flow: user wants REAPER actions
-        if (wantsExecution(userText)) {
-            try {
-                const execResult = await runOrchestrator(userText);
-
-                // Generate conversational response from execution results
-                const responsePrompt = `The user asked: "${userText}"
-
-We executed the following in REAPER:
-- Plan: ${JSON.stringify(execResult.plan, null, 2)}
-- Results: ${JSON.stringify(execResult.results, null, 2)}
-${execResult.errors?.length ? `- Errors: ${JSON.stringify(execResult.errors)}` : ''}
-
-Generate a 2-4 sentence response. Rules:
-- Be specific: mention track names, plugin names, BPM, etc. from the results.
-- If the results show only analyze_project was called but the requested action (e.g. add_fx, create_track) was never called, say the action was NOT completed and explain why based on the output.
-- If any result output contains "ERROR:" or "not found", surface that error verbatim — do not soften it.
-- Do not claim success if the tool results do not confirm it.
-- End with a helpful follow-up question only if the action succeeded.`;
-
-                const responseCompletion = await openai.chat.completions.create({
-                    model: 'gpt-4o',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'You are Magentic. Summarize REAPER execution results in a friendly, conversational way. Be concise.',
-                        },
-                        { role: 'user', content: responsePrompt },
-                    ],
-                    temperature: 0.7,
-                    max_tokens: 512,
-                });
-
-                const reply = responseCompletion.choices[0].message;
-
-                return res.json({
-                    message: reply,
-                    usage: responseCompletion.usage,
-                    executionResults: execResult,
-                });
-            } catch (execError) {
-                console.error('Orchestrator error:', execError.message);
-
-                return res.json({
-                    message: {
-                        role: 'assistant',
-                        content: `I ran into an error executing that request:\n\n\`\`\`\n${execError.message}\n\`\`\`\n\nMake sure REAPER is open, the bridge is running, and check the plugin name matches exactly what appears in the REAPER FX browser (e.g. \`VST3i: Serum 2 (Xfer Records)\`).`,
-                    },
-                    executionResults: { errors: [execError.message] },
-                });
-            }
-        }
-
-        // Chat flow: conversational response only
+        // Build system message with optional context
         let contextBlock = '';
 
         if (includeProjectState) {
@@ -107,7 +53,7 @@ Generate a 2-4 sentence response. Rules:
                 if (file.content != null && file.content !== '') {
                     contextBlock += `\n### ${file.name}\n\`\`\`\n${file.content}\n\`\`\`\n`;
                 } else if (file.url) {
-                    contextBlock += `\n### ${file.name}\n- Type: ${file.type || 'binary'}\n- URL: ${file.url}\n- Use this URL when the user asks to process, separate stems, or transcribe this file.\n`;
+                    contextBlock += `\n### ${file.name}\n- Type: ${file.type || 'binary'}\n- URL: ${file.url}\n`;
                 }
             });
         }
@@ -117,18 +63,79 @@ Generate a 2-4 sentence response. Rules:
             content: SYSTEM_PROMPT + contextBlock,
         };
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [systemMessage, ...messages],
-            temperature: 0.7,
-            max_tokens: 4096,
-        });
+        // Build conversation with function-calling tools
+        const conversationMessages = [systemMessage, ...messages];
+        const toolResults = [];
+        let rounds = 0;
 
-        const reply = completion.choices[0].message;
+        while (rounds < MAX_TOOL_ROUNDS) {
+            rounds++;
 
+            const completion = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: conversationMessages,
+                tools: TOOL_SCHEMAS,
+                temperature: 0.7,
+                max_tokens: 4096,
+            });
+
+            const choice = completion.choices[0];
+            const assistantMsg = choice.message;
+
+            // Append assistant message to conversation
+            conversationMessages.push(assistantMsg);
+
+            // If no tool calls, we're done — this is the final text response
+            if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
+                return res.json({
+                    message: {
+                        role: 'assistant',
+                        content: assistantMsg.content || '',
+                    },
+                    usage: completion.usage,
+                    toolResults: toolResults.length > 0 ? toolResults : undefined,
+                });
+            }
+
+            // Execute each tool call
+            for (const call of assistantMsg.tool_calls) {
+                const fn = TOOL_DISPATCH[call.function.name];
+                let result;
+
+                if (!fn) {
+                    result = { error: `Unknown tool: ${call.function.name}` };
+                } else {
+                    try {
+                        const args = JSON.parse(call.function.arguments);
+                        result = await fn(args);
+                    } catch (err) {
+                        result = { error: err.message };
+                    }
+                }
+
+                toolResults.push({
+                    tool: call.function.name,
+                    input: JSON.parse(call.function.arguments),
+                    result,
+                });
+
+                // Feed result back to the conversation
+                conversationMessages.push({
+                    role: 'tool',
+                    tool_call_id: call.id,
+                    content: JSON.stringify(result),
+                });
+            }
+        }
+
+        // If we hit the limit, return whatever we have
+        const lastMsg = conversationMessages[conversationMessages.length - 1];
         res.json({
-            message: reply,
-            usage: completion.usage,
+            message: {
+                role: 'assistant',
+                content: lastMsg.content || 'I completed the requested actions. Check REAPER to see the results.',
+            },
+            toolResults,
         });
     } catch (error) {
         console.error('Chat error:', error.message);

@@ -149,5 +149,15 @@ if __name__ == "__main__":
     print(f"\n🧲 Magentic Bridge starting on http://localhost:{port}")
     print("   POST /execute  — Run reapy code in REAPER")
     print("   GET  /analyze  — Read full REAPER project state")
-    print("   GET  /status   — Check REAPER connection\n")
+    print("   GET  /status   — Check REAPER connection")
+
+    # Warmup: flush reapy's connection to prevent stale first-call data
+    try:
+        import reapy
+        RPR = reapy.reascript_api
+        n = RPR.CountTracks(0)
+        print(f"   ✅  REAPER connected — {n} tracks in project\n")
+    except Exception as e:
+        print(f"   ⚠️  REAPER warmup failed: {e} (will retry on first request)\n")
+
     uvicorn.run(app, host="0.0.0.0", port=port)
