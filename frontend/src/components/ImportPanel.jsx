@@ -1,0 +1,166 @@
+import { useState, useRef } from 'react';
+
+const API_URL = 'http://localhost:3001';
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function getFileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const icons = {
+        lua: '🟦', js: '🟨', py: '🐍', txt: '📄', md: '📝',
+        wav: '🎵', mp3: '🎵', json: '📋', xml: '📰', csv: '📊',
+        rpp: '🎛️', reapeaks: '📈',
+    };
+    return icons[ext] || '📁';
+}
+
+export default function ImportPanel({ files, setFiles, onFilesChange }) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef(null);
+
+    const uploadFile = async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`${API_URL}/api/files/upload`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!res.ok) {
+            throw new Error('Upload failed');
+        }
+
+        const data = await res.json();
+
+        // Get file content for context
+        const contentRes = await fetch(`${API_URL}/api/files/${data.id}/content`);
+        const contentData = await contentRes.json();
+
+        return {
+            id: data.id,
+            name: data.name,
+            size: data.size,
+            content: contentData.content,
+            uploadedAt: data.uploadedAt,
+        };
+    };
+
+    const handleFiles = async (fileList) => {
+        setUploading(true);
+        try {
+            const newFiles = [];
+            for (const file of fileList) {
+                const uploaded = await uploadFile(file);
+                newFiles.push(uploaded);
+            }
+            const updated = [...files, ...newFiles];
+            setFiles(updated);
+            onFilesChange(updated);
+        } catch (err) {
+            console.error('Upload error:', err);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        try {
+            await fetch(`${API_URL}/api/files/${id}`, { method: 'DELETE' });
+            const updated = files.filter((f) => f.id !== id);
+            setFiles(updated);
+            onFilesChange(updated);
+        } catch (err) {
+            console.error('Delete error:', err);
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files.length) {
+            handleFiles(Array.from(e.dataTransfer.files));
+        }
+    };
+
+    return (
+        <div className="import-panel panel">
+            <div className="panel-header">
+                <span className="panel-title">📂 Import Module</span>
+                {files.length > 0 && (
+                    <span className="panel-badge">{files.length} files</span>
+                )}
+            </div>
+
+            <div className="panel-content">
+                <div
+                    className={`drop-zone ${isDragging ? 'drag-over' : ''}`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    <div className="drop-zone-icon">
+                        {uploading ? '⏳' : '📎'}
+                    </div>
+                    <div className="drop-zone-text">
+                        {uploading ? 'Uploading...' : 'Drop files here'}
+                    </div>
+                    <div className="drop-zone-subtext">
+                        or click to browse
+                    </div>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleFiles(Array.from(e.target.files))}
+                    />
+                </div>
+
+                {files.length > 0 ? (
+                    <div className="file-list">
+                        {files.map((file) => (
+                            <div key={file.id} className="file-item">
+                                <div className="file-icon">{getFileIcon(file.name)}</div>
+                                <div className="file-info">
+                                    <div className="file-name">{file.name}</div>
+                                    <div className="file-meta">{formatSize(file.size)}</div>
+                                </div>
+                                <button
+                                    className="file-delete"
+                                    onClick={() => handleDelete(file.id)}
+                                    title="Remove file"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="empty-state">
+                        <div className="empty-state-icon">📁</div>
+                        <div className="empty-state-text">
+                            Import scripts, project files, or notes to add them to the agent's context window
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
