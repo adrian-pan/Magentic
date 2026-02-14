@@ -4,6 +4,7 @@ Runs as a FastAPI server on port 5000.
 """
 
 import io
+import os
 import sys
 import json
 import traceback
@@ -201,8 +202,9 @@ def root():
 if __name__ == "__main__":
     import uvicorn
 
-    print("\n🧲 Magentic Bridge starting on http://localhost:5000")
+    port = int(os.environ.get("BRIDGE_PORT", 5001))
+    print(f"\n🧲 Magentic Bridge starting on http://localhost:{port}")
     print("   POST /execute  — Run reapy code in REAPER")
     print("   GET  /analyze  — Read full REAPER project state")
     print("   GET  /status   — Check REAPER connection\n")
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
