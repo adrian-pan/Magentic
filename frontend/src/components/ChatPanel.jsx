@@ -3,17 +3,20 @@ import { useState, useRef, useEffect } from 'react';
 const API_URL = 'http://localhost:3001';
 
 const SUGGESTIONS = [
-    'Create a drum pattern in REAPER',
-    'How do I automate volume in REAPER?',
-    'Generate a synth pad Lua script',
-    'Explain REAPER FX chains',
+    'Analyze my project and suggest improvements',
+    'Add a new track called BASS',
+    'Help me mix this track',
+    'Set the tempo to 140 BPM',
 ];
 
-export default function ChatPanel({ contextFiles }) {
+export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [reaperStatus, setReaperStatus] = useState(null);
+    const [executingBlocks, setExecutingBlocks] = useState({});
+    const [executeResults, setExecuteResults] = useState({});
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
 
@@ -21,11 +24,54 @@ export default function ChatPanel({ contextFiles }) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
 
+    // Check REAPER status periodically
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/reaper/status`);
+                const data = await res.json();
+                setReaperStatus(data);
+            } catch {
+                setReaperStatus({ reaper_connected: false, error: 'Backend unreachable' });
+            }
+        };
+        checkStatus();
+        const interval = setInterval(checkStatus, 10000);
+        return () => clearInterval(interval);
+    }, []);
+
     const autoResize = () => {
         const ta = textareaRef.current;
         if (ta) {
             ta.style.height = 'auto';
             ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+        }
+    };
+
+    const executeCode = async (code, blockId) => {
+        setExecutingBlocks((prev) => ({ ...prev, [blockId]: true }));
+        setExecuteResults((prev) => ({ ...prev, [blockId]: null }));
+
+        try {
+            const res = await fetch(`${API_URL}/api/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            });
+            const data = await res.json();
+            setExecuteResults((prev) => ({ ...prev, [blockId]: data }));
+
+            // After execution, refresh project state
+            if (data.success && onAnalyze) {
+                setTimeout(() => onAnalyze(), 500);
+            }
+        } catch (err) {
+            setExecuteResults((prev) => ({
+                ...prev,
+                [blockId]: { success: false, error: err.message },
+            }));
+        } finally {
+            setExecutingBlocks((prev) => ({ ...prev, [blockId]: false }));
         }
     };
 
@@ -49,6 +95,7 @@ export default function ChatPanel({ contextFiles }) {
                 body: JSON.stringify({
                     messages: updatedMessages,
                     contextFiles,
+                    includeProjectState: reaperStatus?.reaper_connected || false,
                 }),
             });
 
@@ -73,15 +120,47 @@ export default function ChatPanel({ contextFiles }) {
         }
     };
 
-    const renderContent = (text) => {
-        // Simple markdown-ish rendering for code blocks
-        const parts = text.split(/(```[\s\S]*?```)/g);
+    const renderContent = (text, messageIdx) => {
+        const parts = text.split(/(```(?:python:execute|[a-z]*)\n[\s\S]*?```)/g);
+        let blockCounter = 0;
+
         return parts.map((part, i) => {
+            if (part.startsWith('```python:execute')) {
+                const code = part.replace(/^```python:execute\n?/, '').replace(/\n?```$/, '');
+                const blockId = `${messageIdx}-${blockCounter++}`;
+                const isExecuting = executingBlocks[blockId];
+                const result = executeResults[blockId];
+
+                return (
+                    <div key={i} className="executable-block">
+                        <div className="executable-header">
+                            <span className="executable-label">⚡ Executable</span>
+                            <button
+                                className={`execute-btn ${isExecuting ? 'executing' : ''} ${result?.success ? 'success' : ''} ${result && !result.success ? 'error' : ''}`}
+                                onClick={() => executeCode(code, blockId)}
+                                disabled={isExecuting}
+                            >
+                                {isExecuting ? '⏳ Running...' : result?.success ? '✅ Re-run' : result ? '❌ Retry' : '▶ Execute in REAPER'}
+                            </button>
+                        </div>
+                        <pre><code>{code}</code></pre>
+                        {result && (
+                            <div className={`execute-result ${result.success ? 'success' : 'error'}`}>
+                                <div className="execute-result-header">
+                                    {result.success ? '✅ Output' : '❌ Error'}
+                                </div>
+                                <pre>{result.output || result.error}</pre>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
             if (part.startsWith('```')) {
                 const code = part.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
                 return <pre key={i}><code>{code}</code></pre>;
             }
-            // Split by inline code
+
             const inlineParts = part.split(/(`[^`]+`)/g);
             return (
                 <span key={i}>
@@ -105,9 +184,19 @@ export default function ChatPanel({ contextFiles }) {
         <div className="chat-panel panel">
             <div className="panel-header">
                 <span className="panel-title">🤖 AI Agent</span>
-                {messages.length > 0 && (
-                    <span className="panel-badge">{messages.length} messages</span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {reaperStatus && (
+                        <div className={`reaper-status ${reaperStatus.reaper_connected ? 'connected' : 'disconnected'}`}>
+                            <div className={`reaper-dot ${reaperStatus.reaper_connected ? '' : 'offline'}`} />
+                            {reaperStatus.reaper_connected
+                                ? `REAPER ${reaperStatus.reaper_version}`
+                                : 'REAPER Offline'}
+                        </div>
+                    )}
+                    {messages.length > 0 && (
+                        <span className="panel-badge">{messages.length} messages</span>
+                    )}
+                </div>
             </div>
 
             <div className="chat-messages">
@@ -116,8 +205,8 @@ export default function ChatPanel({ contextFiles }) {
                         <div className="welcome-icon">🧲</div>
                         <h2 className="welcome-title">Welcome to Magentic</h2>
                         <p className="welcome-subtitle">
-                            Your AI music production assistant. Ask me anything about REAPER,
-                            sound design, or scripting — I'm here to help you create.
+                            Your project-aware AI production assistant. I can read your REAPER session,
+                            analyze it like a mix engineer, and execute multi-step production plans.
                         </p>
                         <div className="welcome-chips">
                             {SUGGESTIONS.map((s) => (
@@ -139,7 +228,7 @@ export default function ChatPanel({ contextFiles }) {
                                     {msg.role === 'user' ? '👤' : '🧲'}
                                 </div>
                                 <div className="message-bubble">
-                                    {renderContent(msg.content)}
+                                    {renderContent(msg.content, i)}
                                 </div>
                             </div>
                         ))}
@@ -171,7 +260,7 @@ export default function ChatPanel({ contextFiles }) {
                     <textarea
                         ref={textareaRef}
                         className="chat-input"
-                        placeholder="Ask Magentic anything..."
+                        placeholder="Ask Magentic to analyze, modify, or mix your REAPER project..."
                         value={input}
                         onChange={(e) => { setInput(e.target.value); autoResize(); }}
                         onKeyDown={handleKeyDown}
