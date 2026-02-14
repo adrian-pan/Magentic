@@ -33,20 +33,19 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
         });
 
         if (!res.ok) {
-            throw new Error('Upload failed');
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Upload failed');
         }
 
         const data = await res.json();
-
-        // Get file content for context
-        const contentRes = await fetch(`${API_URL}/api/files/${data.id}/content`);
-        const contentData = await contentRes.json();
 
         return {
             id: data.id,
             name: data.name,
             size: data.size,
-            content: contentData.content,
+            type: data.type,
+            url: data.url,
+            content: data.content ?? null,
             uploadedAt: data.uploadedAt,
         };
     };

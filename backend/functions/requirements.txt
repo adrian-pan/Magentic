@@ -1,0 +1,30 @@
+# ===========================================
+# Demucs - Stem separation
+# ===========================================
+dora-search
+einops
+julius>=0.2.3
+lameenc>=1.2
+openunmix
+pyyaml
+torch>=1.8.1
+torchaudio>=0.8
+tqdm
+
+# ===========================================
+# Basic Pitch - Audio-to-MIDI
+# ===========================================
+librosa>=0.8.0
+mir_eval>=0.6.0
+numpy>=1.18
+pretty_midi>=0.2.9
+resampy>=0.2.2,<0.4.3
+scikit-learn
+scipy>=1.4.1
+typing_extensions
+
+# Model runtimes (install at least one for basic-pitch)
+# macOS: coremltools or onnxruntime
+# Linux/Windows: onnxruntime
+onnxruntime>=1.10.0
+# coremltools; platform_system == 'Darwin'

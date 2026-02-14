@@ -6,31 +6,60 @@ AI-powered music production assistant with REAPER integration.
 
 ```
 Magentic/
-├── backend/          Express + OpenAI
-│   ├── server.js         ← entry point
-│   ├── agent/            ← AI system prompt (REAPER API knowledge)
-│   └── routes/           ← /api/chat, /api/files
-└── frontend/         React (Vite)
+├── bridge/           Python FastAPI (REAPER via reapy) — port 5001
+│   ├── main.py
+│   └── requirements.txt
+├── backend/          Express + OpenAI — port 3001
+│   ├── server.js
+│   ├── agent/            ← AI system prompt
+│   ├── functions/        ← stem separation + audio-to-MIDI
+│   └── routes/
+└── frontend/         React (Vite) — port 5173
     └── src/
-        ├── App.jsx       ← split-panel layout
-        └── components/
-            ├── ChatPanel.jsx   ← chatbot UI
-            └── ImportPanel.jsx ← file import module
 ```
 
 ## Setup
 
+### 1. Bridge (REAPER control)
+
+**Requires:** REAPER open, reapy configured.
+
 ```bash
-# 1. Backend
+cd bridge
+pip install -r requirements.txt
+python main.py
+```
+
+### 2. Backend
+
+```bash
 cd backend
-cp .env.example .env       # add your OPENAI_API_KEY
+cp .env.example .env       # add OPENAI_API_KEY, optionally SUPABASE_URL + SUPABASE_SERVICE_KEY
 npm install
 npm run dev
+```
 
-# 2. Frontend (new terminal)
+**File storage:** Without Supabase, uploads use local disk. For persistent storage (bucket for stems, MIDI), create a Supabase project, add a Storage bucket `magentic-files`, and set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` in `.env`.
+
+### 3. Frontend
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+**Start order:** Bridge → Backend → Frontend. (Bridge only needed for REAPER features.)
+
 Open **http://localhost:5173** — chatbot on the right, import module on the left.
+
+### Agent execution
+
+When you ask for REAPER actions (e.g. "Create a track", "Add a drum beat"), the backend runs the Python orchestrator (`agents/`), which executes in REAPER via the bridge. The agent responds with a summary of what it did. Ensure REAPER is open and the bridge is running for execution to work.
+
+### Audio functions (stem separation, MIDI transcription)
+
+- **POST /api/functions/separate-stems** — body: `{ "url": "..." }` (audio file URL)
+- **POST /api/functions/transcribe-to-midi** — body: `{ "url": "..." }` (audio file URL)
+
+Upload a file via the Import Module, then call these endpoints with the file's `url`. Outputs are stored in Supabase (or returned as local paths if Supabase is not configured).
