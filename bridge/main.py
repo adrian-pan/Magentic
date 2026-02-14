@@ -152,9 +152,17 @@ if __name__ == "__main__":
     print("   GET  /status   — Check REAPER connection")
 
     # Warmup: flush reapy's connection to prevent stale first-call data
+    # reapy's socket handshake leaves residual data that poisons the first
+    # few API calls. We make several throwaway calls to drain it.
     try:
         import reapy
         RPR = reapy.reascript_api
+        # Multiple calls to fully flush any stale handshake data
+        for i in range(5):
+            try:
+                v = RPR.GetAppVersion()
+            except Exception:
+                pass
         n = RPR.CountTracks(0)
         print(f"   ✅  REAPER connected — {n} tracks in project\n")
     except Exception as e:

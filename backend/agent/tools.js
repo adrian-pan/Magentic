@@ -53,12 +53,11 @@ async function analyzeProject() {
 async function createTrack({ name, index = -1 }) {
     return runCode(`
 import reapy
-RPR = reapy.reascript_api
-n = int(RPR.CountTracks(0))
-idx = int(${index}) if ${index} >= 0 else n
-RPR.InsertTrackAtIndex(idx, True)
-track = RPR.GetTrack(0, idx)
-RPR.GetSetMediaTrackInfo_String(track, "P_NAME", ${JSON.stringify(name)}, True)
+p = reapy.Project()
+idx = ${index}
+if idx < 0:
+    idx = p.n_tracks
+p.add_track(index=idx, name=${JSON.stringify(name)})
 print(f"Created track '${name}' at index {idx}")
     `);
 }
