@@ -70,14 +70,10 @@ def execute_code(request: ExecuteRequest):
     # Build execution namespace with reapy pre-imported
     namespace = {
         "reapy": reapy,
-        "project": None,
         "__builtins__": __builtins__,
     }
 
     try:
-        # Get current project
-        namespace["project"] = reapy.Project()
-
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             exec(request.code, namespace)
 
@@ -96,6 +92,20 @@ def execute_code(request: ExecuteRequest):
         return ExecuteResponse(success=False, error=f"{str(e)}\n\n{tb}")
 
 
+_ANALYZE_SCRIPT = """
+import reapy, json as _json
+_RPR = reapy.reascript_api
+_n = _RPR.CountTracks(0)
+_tracks = []
+for _i in range(_n):
+    _t = _RPR.GetTrack(0, _i)
+    _fx = []
+    for _j in range(_RPR.TrackFX_GetCount(_t)):
+        _fx.append({"index":_j,"name":_RPR.TrackFX_GetFXName(_t,_j,"",256)[3],"is_enabled":_RPR.TrackFX_GetEnabled(_t,_j),"n_params":_RPR.TrackFX_GetNumParams(_t,_j)})
+    _tracks.append({"index":_i,"name":_RPR.GetSetMediaTrackInfo_String(_t,"P_NAME","",False)[3] or f"Track {_i+1}","volume":round(_RPR.GetMediaTrackInfo_Value(_t,"D_VOL"),3),"pan":round(_RPR.GetMediaTrackInfo_Value(_t,"D_PAN"),3),"is_muted":bool(_RPR.GetMediaTrackInfo_Value(_t,"B_MUTE")),"is_solo":bool(_RPR.GetMediaTrackInfo_Value(_t,"I_SOLO")),"is_armed":bool(_RPR.GetMediaTrackInfo_Value(_t,"I_RECARM")),"n_items":_RPR.CountTrackMediaItems(_t),"fx":_fx})
+print(_json.dumps({"success":True,"project":{"bpm":_RPR.Master_GetTempo(),"n_tracks":_n,"cursor_position":round(_RPR.GetCursorPosition(),3),"is_playing":bool(_RPR.GetPlayState()&1)},"tracks":_tracks}))
+"""
+
 @app.get("/analyze")
 def analyze_project():
     """Analyze the current REAPER project and return its full state."""
@@ -104,86 +114,19 @@ def analyze_project():
     except Exception as e:
         return {"success": False, "error": f"Cannot connect to REAPER: {str(e)}"}
 
+    stdout_buf = io.StringIO()
+    stderr_buf = io.StringIO()
+    ns = {"reapy": reapy, "__builtins__": __builtins__}
     try:
-        project = reapy.Project()
-
-        # Build comprehensive project snapshot
-        tracks_data = []
-        for i, track in enumerate(project.tracks):
-            track_info = {
-                "index": i,
-                "name": track.name or f"Track {i + 1}",
-                "volume": round(track.volume, 3),
-                "pan": round(track.pan, 3),
-                "is_muted": track.is_muted,
-                "is_solo": track.is_solo,
-                "is_armed": track.is_armed,
-                "n_items": track.n_items,
-                "color": track.color,
-                "fx": [],
-            }
-
-            # Get FX chain details
-            try:
-                for j, fx in enumerate(track.fxs):
-                    fx_info = {
-                        "index": j,
-                        "name": fx.name,
-                        "is_enabled": fx.is_enabled,
-                        "n_params": fx.n_params,
-                        "params": {},
-                    }
-                    # Capture first 10 params (to avoid huge payloads)
-                    try:
-                        for k in range(min(fx.n_params, 10)):
-                            param_name = fx.params[k].name if hasattr(fx.params[k], 'name') else f"Param {k}"
-                            fx_info["params"][param_name] = round(float(fx.params[k]), 4)
-                    except Exception:
-                        pass
-                    track_info["fx"].append(fx_info)
-            except Exception:
-                pass
-
-            # Get item info
-            items_data = []
-            try:
-                for item in track.items:
-                    items_data.append({
-                        "position": round(item.position, 3),
-                        "length": round(item.length, 3),
-                        "is_muted": item.is_muted,
-                        "active_take": item.active_take.name if item.active_take else None,
-                    })
-            except Exception:
-                pass
-            track_info["items"] = items_data
-
-            tracks_data.append(track_info)
-
-        project_state = {
-            "success": True,
-            "project": {
-                "name": project.name,
-                "bpm": project.bpm,
-                "length": round(project.length, 3),
-                "n_tracks": len(project.tracks),
-                "cursor_position": round(project.cursor_position, 3),
-                "is_playing": False,  # reapy may not expose this directly
-            },
-            "tracks": tracks_data,
-        }
-
-        # Try to get play state
-        try:
-            project_state["project"]["is_playing"] = project.is_playing
-        except Exception:
-            pass
-
-        return project_state
-
+        with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+            exec(_ANALYZE_SCRIPT, ns)
+        out = stdout_buf.getvalue().strip()
+        if not out:
+            err = stderr_buf.getvalue().strip()
+            return {"success": False, "error": err or "No output from analyze script"}
+        return json.loads(out)
     except Exception as e:
-        tb = traceback.format_exc()
-        return {"success": False, "error": f"{str(e)}\n\n{tb}"}
+        return {"success": False, "error": f"{str(e)}\n{stderr_buf.getvalue()}"}
 
 
 @app.get("/")

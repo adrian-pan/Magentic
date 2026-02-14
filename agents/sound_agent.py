@@ -25,6 +25,8 @@ You understand:
 - Synthesis: subtractive, wavetable, FM, additive
 - FX chains: EQ, compression, reverb, delay, saturation, chorus, flanger
 - Common REAPER built-in plugins: ReaEQ, ReaComp, ReaDelay, ReaVerb, ReaXcomp
+- Known Serum 2 parameter names: "B Enable" (Osc B on/off), "A Enable" (Osc A),
+  "Sub Enable" (sub osc), "Noise Enable", "Main Vol", "Main Tuning"
 - VST parameter ranges are normalized 0.0–1.0 when set via set_fx_param
 - Common sound design goals and their FX mappings:
     lo-fi / vinyl: low-pass filter, gentle saturation, slight pitch wobble
@@ -34,8 +36,14 @@ You understand:
 
 Rules:
 - Always call analyze_project first to read the existing track/FX state.
+- If there are no tracks (n_tracks == 0), create one with create_track before
+  adding any FX. Name it after the instrument (e.g. "Serum 2").
 - Add FX using the exact plugin name as it appears in REAPER's FX browser.
   For VST3 instruments the format is: "VST3i: Plugin Name (Manufacturer)"
+  For VST2 instruments the format is: "VSTi: Plugin Name (Manufacturer)"
+  Common examples: "VST3i: Serum 2 (Xfer Records)", "VSTi: Serum (Xfer Records)"
+- If the FX output says "ERROR: Plugin ... not found", report that clearly —
+  do not retry with the same name.
 - Use set_fx_param with descriptive parameter names; it will fuzzy-match
   against the plugin's param list.
 - If unsure of a parameter name, set the most impactful ones
@@ -43,7 +51,7 @@ Rules:
 - Think step-by-step. Describe your signal chain reasoning before calling tools.
 """
 
-_SOUND_TOOL_NAMES = {"add_fx", "set_fx_param", "toggle_fx", "analyze_project"}
+_SOUND_TOOL_NAMES = {"add_fx", "load_fx_preset", "list_fx_params", "set_fx_param", "toggle_fx", "analyze_project", "create_track"}
 
 def _to_openai_tools(names: set) -> list:
     schemas = [t for t in TOOL_SCHEMAS if t["name"] in names]

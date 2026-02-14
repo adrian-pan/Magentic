@@ -25,6 +25,7 @@ You understand:
 - Gain staging: keeping levels healthy without clipping
 - Volume scale: 1.0 = 0 dB, 0.707 ≈ -3 dB, 0.5 ≈ -6 dB, 0.0 = silence
 - Panning: -1.0 = full left, 0.0 = center, 1.0 = full right
+- Automation: creating volume envelopes for dynamic changes
 - Track organization and color coding conventions:
     drums   → orange-red  (r=220 g=80  b=40)
     bass    → deep blue   (r=40  g=80  b=200)

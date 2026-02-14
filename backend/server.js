@@ -6,6 +6,7 @@ const path = require('path');
 const chatRoutes = require('./routes/chat');
 const fileRoutes = require('./routes/files');
 const executeRoutes = require('./routes/execute');
+const functionRoutes = require('./routes/functions');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,6 +18,7 @@ app.use(express.json({ limit: '10mb' }));
 // API Routes
 app.use('/api/chat', chatRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/functions', functionRoutes);
 app.use('/api/execute', executeRoutes);
 app.use('/api/reaper', executeRoutes);
 
@@ -30,8 +32,10 @@ app.listen(PORT, () => {
     console.log(`\n🧲 Magentic Backend running on http://localhost:${PORT}`);
     console.log(`   API endpoints:`);
     console.log(`   POST /api/chat          — Chat with the AI agent`);
-    console.log(`   POST /api/files/upload   — Upload a context file`);
-    console.log(`   GET  /api/files          — List uploaded files`);
+    console.log(`   POST /api/files/upload        — Upload file (Supabase)`);
+    console.log(`   GET  /api/files               — List uploaded files`);
+    console.log(`   POST /api/functions/separate-stems    — Stem separation`);
+    console.log(`   POST /api/functions/transcribe-to-midi — Audio to MIDI`);
     console.log(`   POST /api/execute        — Execute code in REAPER`);
     console.log(`   GET  /api/reaper/status  — REAPER connection status`);
     console.log(`   GET  /api/reaper/analyze — Analyze REAPER project`);

@@ -32,7 +32,7 @@ export default function App() {
 
   const handleFilesChange = (updatedFiles) => {
     setContextFiles(
-      updatedFiles.map(({ id, name, content }) => ({ id, name, content }))
+      updatedFiles.map(({ id, name, content, url, type }) => ({ id, name, content, url, type }))
     );
   };
 

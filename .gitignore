@@ -1,1 +1,25 @@
 instructions.json
+.env
+**/.env
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Audio/binary outputs
+*.mp3
+*.wav
+*.mid
+*.midi
+backend/functions/stems/
+backend/functions/basic-pitch/
+backend/functions/demucs/
+
+# IDE
+.vscode/

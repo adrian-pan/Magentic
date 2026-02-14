@@ -106,6 +106,11 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
             }
 
             setMessages([...updatedMessages, data.message]);
+
+            // Refresh project state after REAPER execution
+            if (data.executionResults && onAnalyze) {
+                setTimeout(() => onAnalyze(), 500);
+            }
         } catch (err) {
             setError(err.message);
         } finally {

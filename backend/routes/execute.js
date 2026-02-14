@@ -2,7 +2,7 @@ const express = require('express');
 
 const router = express.Router();
 
-const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:5000';
+const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:5001';
 
 // POST /api/execute — proxy to Python bridge
 router.post('/', async (req, res) => {
