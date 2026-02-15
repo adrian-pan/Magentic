@@ -150,8 +150,11 @@ def create_midi_item(track_index: int, position: float, length: float) -> dict:
         import reapy
         RPR = reapy.reascript_api
         track = RPR.GetTrack(0, {track_index})
-        item = RPR.CreateNewMIDIItemInProj(track, {position}, {position + length}, False)
-        print(f"Created MIDI item on track {track_index} at pos={position} len={length}")
+        # True = positions are in quarter notes (beats)
+        item = RPR.CreateNewMIDIItemInProj(track, {position}, {position + length}, True)
+        if isinstance(item, (list, tuple)): item = item[0]
+        RPR.UpdateArrange()
+        print(f"Created MIDI item on track {track_index} at pos={position} len={length} (beats)")
     """
     return _run(code)
 
@@ -176,13 +179,187 @@ def add_midi_notes(
         track = RPR.GetTrack(0, {track_index})
         item = RPR.GetTrackMediaItem(track, {item_index})
         take = RPR.GetActiveTake(item)
+        # Get item start position in quarter notes for offset calculation
+        item_pos_sec = float(RPR.GetMediaItemInfo_Value(item, "D_POSITION"))
+        item_start_qn = float(RPR.TimeMap2_timeToQN(0, item_pos_sec))
         notes = {notes!r}
         for n in notes:
-            start_ppq = RPR.MIDI_GetPPQPosFromProjQN(take, n['start'])
-            end_ppq = RPR.MIDI_GetPPQPosFromProjQN(take, n['start'] + n['length'])
-            RPR.MIDI_InsertNote(take, False, False, start_ppq, end_ppq, 0, n['pitch'], n.get('velocity', 100), False)
+            # Convert item-relative beat positions to project-absolute QN
+            abs_start_qn = item_start_qn + n['start']
+            abs_end_qn = item_start_qn + n['start'] + n['length']
+            start_ppq = RPR.MIDI_GetPPQPosFromProjQN(take, abs_start_qn)
+            end_ppq = RPR.MIDI_GetPPQPosFromProjQN(take, abs_end_qn)
+            RPR.MIDI_InsertNote(take, False, False, int(float(start_ppq)), int(float(end_ppq)), 0, n['pitch'], n.get('velocity', 100), False)
         RPR.MIDI_Sort(take)
+        RPR.UpdateArrange()
         print(f"Added {{len(notes)}} notes to track {track_index} item {item_index}")
+    """
+    return _run(code)
+
+
+def read_midi_notes(track_index: int, item_index: int) -> dict:
+    """Read all MIDI notes from a MIDI item and return them as a list."""
+    code = f"""
+        import reapy, json as _json
+        RPR = reapy.reascript_api
+        track = RPR.GetTrack(0, {track_index})
+        item = RPR.GetTrackMediaItem(track, {item_index})
+        take = RPR.GetActiveTake(item)
+        item_pos = RPR.GetMediaItemInfo_Value(item, "D_POSITION")
+        n_notes = int(RPR.MIDI_CountEvts(take, 0, 0, 0)[2])
+        notes = []
+        for i in range(n_notes):
+            ret = RPR.MIDI_GetNote(take, i, False, False, 0, 0, 0, 0, 0)
+            _, _, _, selected, muted, start_ppq, end_ppq, chan, pitch, vel = ret
+            start_ppq = float(start_ppq); end_ppq = float(end_ppq)
+            pitch = int(pitch); vel = int(vel); chan = int(chan)
+            start_sec = RPR.MIDI_GetProjTimeFromPPQPos(take, start_ppq)
+            end_sec = RPR.MIDI_GetProjTimeFromPPQPos(take, end_ppq)
+            start_qn = RPR.MIDI_GetProjQNFromPPQPos(take, start_ppq)
+            end_qn = RPR.MIDI_GetProjQNFromPPQPos(take, end_ppq)
+            notes.append({{
+                "index": i, "pitch": pitch, "velocity": vel, "channel": chan,
+                "start_sec": round(float(start_sec), 4), "end_sec": round(float(end_sec), 4),
+                "start_beats": round(float(start_qn), 4), "end_beats": round(float(end_qn), 4),
+                "selected": bool(selected), "muted": bool(muted)
+            }})
+        print(_json.dumps({{"n_notes": n_notes, "item_position": float(item_pos), "notes": notes}}))
+    """
+    return _run(code)
+
+
+def extend_harmony(
+    track_index: int,
+    source_item_index: int,
+    target_track_index: int,
+    intervals: list[int],
+) -> dict:
+    """
+    Read notes from a source MIDI item and write transposed copies to a new
+    MIDI item on the target track, creating harmony.
+
+    intervals: list of semitone offsets, e.g. [4, 7] for major third + fifth.
+    """
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+
+        # Read source notes
+        src_track = RPR.GetTrack(0, {track_index})
+        src_item = RPR.GetTrackMediaItem(src_track, {source_item_index})
+        src_take = RPR.GetActiveTake(src_item)
+        item_pos = RPR.GetMediaItemInfo_Value(src_item, "D_POSITION")
+        item_len = RPR.GetMediaItemInfo_Value(src_item, "D_LENGTH")
+
+        n_notes = int(RPR.MIDI_CountEvts(src_take, 0, 0, 0)[2])
+        src_notes = []
+        for i in range(n_notes):
+            ret = RPR.MIDI_GetNote(src_take, i, False, False, 0, 0, 0, 0, 0)
+            _, _, _, sel, muted, s_ppq, e_ppq, chan, pitch, vel = ret
+            s_ppq = float(s_ppq); e_ppq = float(e_ppq)
+            pitch = int(pitch); vel = int(vel)
+            s_qn = float(RPR.MIDI_GetProjQNFromPPQPos(src_take, s_ppq))
+            e_qn = float(RPR.MIDI_GetProjQNFromPPQPos(src_take, e_ppq))
+            src_notes.append((s_qn, e_qn, pitch, vel))
+
+        # Create target MIDI item
+        item_pos = float(item_pos); item_len = float(item_len)
+        tgt_track = RPR.GetTrack(0, {target_track_index})
+        tgt_item = RPR.CreateNewMIDIItemInProj(tgt_track, item_pos, item_pos + item_len, False)
+        if isinstance(tgt_item, (list, tuple)): tgt_item = tgt_item[0]
+        tgt_take = RPR.GetActiveTake(tgt_item)
+
+        intervals = {intervals!r}
+        count = 0
+        for s_qn, e_qn, pitch, vel in src_notes:
+            for iv in intervals:
+                new_pitch = pitch + iv
+                if 0 <= new_pitch <= 127:
+                    s_ppq = float(RPR.MIDI_GetPPQPosFromProjQN(tgt_take, s_qn))
+                    e_ppq = float(RPR.MIDI_GetPPQPosFromProjQN(tgt_take, e_qn))
+                    RPR.MIDI_InsertNote(tgt_take, False, False, int(s_ppq), int(e_ppq), 0, new_pitch, vel, False)
+                    count += 1
+        RPR.MIDI_Sort(tgt_take)
+        RPR.UpdateArrange()
+        print(f"Added {{count}} harmony notes (intervals {intervals!r}) to track {target_track_index}")
+    """
+    return _run(code)
+
+
+def delete_midi_notes(track_index: int, item_index: int) -> dict:
+    """Delete all MIDI notes from a MIDI item."""
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+        track = RPR.GetTrack(0, {track_index})
+        item = RPR.GetTrackMediaItem(track, {item_index})
+        take = RPR.GetActiveTake(item)
+        n_notes = int(RPR.MIDI_CountEvts(take, 0, 0, 0)[2])
+        # Delete in reverse order so indices stay valid
+        for i in range(n_notes - 1, -1, -1):
+            RPR.MIDI_DeleteNote(take, i)
+        RPR.MIDI_Sort(take)
+        RPR.UpdateArrange()
+        print(f"Deleted {{n_notes}} notes from track {track_index} item {item_index}")
+    """
+    return _run(code)
+
+
+def replace_harmony(
+    track_index: int,
+    source_item_index: int,
+    target_track_index: int,
+    target_item_index: int,
+    intervals: list[int],
+) -> dict:
+    """
+    Clear all notes from the target MIDI item, then write transposed copies
+    of the source melody notes into it. Use this to fix bad/dense harmony.
+
+    intervals: list of semitone offsets, e.g. [4, 7] for major third + fifth.
+    """
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+
+        # Read source notes
+        src_track = RPR.GetTrack(0, {track_index})
+        src_item = RPR.GetTrackMediaItem(src_track, {source_item_index})
+        src_take = RPR.GetActiveTake(src_item)
+
+        n_notes = int(RPR.MIDI_CountEvts(src_take, 0, 0, 0)[2])
+        src_notes = []
+        for i in range(n_notes):
+            ret = RPR.MIDI_GetNote(src_take, i, False, False, 0, 0, 0, 0, 0)
+            _, _, _, sel, muted, s_ppq, e_ppq, chan, pitch, vel = ret
+            s_ppq = float(s_ppq); e_ppq = float(e_ppq)
+            pitch = int(pitch); vel = int(vel)
+            s_qn = float(RPR.MIDI_GetProjQNFromPPQPos(src_take, s_ppq))
+            e_qn = float(RPR.MIDI_GetProjQNFromPPQPos(src_take, e_ppq))
+            src_notes.append((s_qn, e_qn, pitch, vel))
+
+        # Clear target item
+        tgt_track = RPR.GetTrack(0, {target_track_index})
+        tgt_item = RPR.GetTrackMediaItem(tgt_track, {target_item_index})
+        tgt_take = RPR.GetActiveTake(tgt_item)
+        old_count = int(RPR.MIDI_CountEvts(tgt_take, 0, 0, 0)[2])
+        for i in range(old_count - 1, -1, -1):
+            RPR.MIDI_DeleteNote(tgt_take, i)
+
+        # Write harmony notes
+        intervals = {intervals!r}
+        count = 0
+        for s_qn, e_qn, pitch, vel in src_notes:
+            for iv in intervals:
+                new_pitch = pitch + iv
+                if 0 <= new_pitch <= 127:
+                    s_ppq = float(RPR.MIDI_GetPPQPosFromProjQN(tgt_take, s_qn))
+                    e_ppq = float(RPR.MIDI_GetPPQPosFromProjQN(tgt_take, e_qn))
+                    RPR.MIDI_InsertNote(tgt_take, False, False, int(s_ppq), int(e_ppq), 0, new_pitch, vel, False)
+                    count += 1
+        RPR.MIDI_Sort(tgt_take)
+        RPR.UpdateArrange()
+        print(f"Cleared {{old_count}} old notes, added {{count}} harmony notes (intervals {intervals!r}) to track {target_track_index}")
     """
     return _run(code)
 
@@ -534,6 +711,67 @@ TOOL_SCHEMAS = [
         "description": "Read the current REAPER project state (tracks, FX, items, BPM, etc.).",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "read_midi_notes",
+        "description": "Read all MIDI notes from a MIDI item on a track. Returns note details (pitch, start, end, velocity, channel) for each note.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "item_index": {"type": "integer", "description": "Index of the MIDI item on the track"},
+            },
+            "required": ["track_index", "item_index"],
+        },
+    },
+    {
+        "name": "extend_harmony",
+        "description": "Read notes from a source MIDI item and create transposed copies on a target track to add harmony. Common intervals: 3 (minor third), 4 (major third), 7 (perfect fifth), 12 (octave).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer", "description": "Source track index containing the melody"},
+                "source_item_index": {"type": "integer", "description": "Index of the source MIDI item"},
+                "target_track_index": {"type": "integer", "description": "Target track index for the harmony"},
+                "intervals": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Semitone intervals for harmony, e.g. [4, 7] for major third + fifth",
+                },
+            },
+            "required": ["track_index", "source_item_index", "target_track_index", "intervals"],
+        },
+    },
+    {
+        "name": "delete_midi_notes",
+        "description": "Delete all MIDI notes from a MIDI item. Use this to clear bad notes before rewriting.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "item_index": {"type": "integer", "description": "Index of the MIDI item on the track"},
+            },
+            "required": ["track_index", "item_index"],
+        },
+    },
+    {
+        "name": "replace_harmony",
+        "description": "Clear all notes from the target harmony MIDI item and replace them with transposed copies of the source melody. Use this to FIX bad or dense harmony — it deletes old notes first. Common intervals: 4 (major third), 7 (perfect fifth), 3 (minor third), 5 (perfect fourth).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer", "description": "Source track index containing the melody"},
+                "source_item_index": {"type": "integer", "description": "Index of the source MIDI item"},
+                "target_track_index": {"type": "integer", "description": "Target track index for the harmony"},
+                "target_item_index": {"type": "integer", "description": "Index of the existing MIDI item on the target track to replace notes in"},
+                "intervals": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Semitone intervals for harmony, e.g. [4, 7] for major third + fifth",
+                },
+            },
+            "required": ["track_index", "source_item_index", "target_track_index", "target_item_index", "intervals"],
+        },
+    },
 ]
 
 # Map tool name → callable function (used by agent dispatch)
@@ -553,4 +791,8 @@ TOOL_DISPATCH: dict[str, Any] = {
     "play": play,
     "stop": stop,
     "analyze_project": analyze_project,
+    "read_midi_notes": read_midi_notes,
+    "extend_harmony": extend_harmony,
+    "delete_midi_notes": delete_midi_notes,
+    "replace_harmony": replace_harmony,
 }
