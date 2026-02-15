@@ -30,6 +30,26 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Live Voice FX Control (v1)
+
+Live mode can **only bypass/enable FX** on a single designated REAPER track named **`BOT_FX`**.
+
+**Project setup:**
+- Create track `VOICE_IN`
+  - **Record armed**
+  - **Input monitoring ON**
+  - Input set to your mic
+- Create track `BOT_FX`
+  - Add a **send from `VOICE_IN` → `BOT_FX`**
+  - Turn **`VOICE_IN` master send OFF**
+  - **Preload FX on `BOT_FX`** (Valhalla, etc.) and **bypass them by default**
+  - Keep **`BOT_FX` master send ON**
+
+**What the bot can do in v1:**
+- `get_botfx_state` — list FX + enabled state on `BOT_FX`
+- `toggle_botfx_by_name` — enable/disable the first matching FX by name substring
+- `panic_botfx` — bypass all FX on `BOT_FX`
+
 ### 2. Backend
 
 ```bash

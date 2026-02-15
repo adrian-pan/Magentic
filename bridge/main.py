@@ -3,6 +3,13 @@ Magentic Bridge — Python/reapy bridge for direct REAPER control.
 Runs as a FastAPI server on port 5000.
 """
 
+# Import reapy FIRST to avoid circular import issues
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='reapy')
+
+import reapy
+REAPY_AVAILABLE = True
+
 import io
 import math
 import os
@@ -15,7 +22,6 @@ import urllib.request
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Optional, List
 
-import reapy
 import threading
 
 from fastapi import FastAPI
@@ -70,10 +76,10 @@ class RemoveEnvelopeRequest(BaseModel):
 @app.get("/status", response_model=StatusResponse)
 def get_status():
     """Check if REAPER is reachable via reapy."""
+    if not REAPY_AVAILABLE or reapy is None:
+        return StatusResponse(reaper_connected=False, error="reapy not available")
     with REAPY_LOCK:
         try:
-            # import reapy  <-- Removed
-    
             version = reapy.get_reaper_version()
             return StatusResponse(reaper_connected=True, reaper_version=version)
         except Exception as e:
@@ -86,9 +92,10 @@ def get_status():
 @app.post("/execute", response_model=ExecuteResponse)
 def execute_code(request: ExecuteRequest):
     """Execute Python/reapy code in REAPER's context."""
+    if not REAPY_AVAILABLE or reapy is None:
+        return ExecuteResponse(success=False, error="reapy not available")
     with REAPY_LOCK:
         try:
-            # import reapy <-- Removed
             pass
     
         except Exception as e:
@@ -149,9 +156,10 @@ print(_json.dumps({"success":True,"project":{"bpm":_RPR.Master_GetTempo(),"n_tra
 @app.get("/analyze")
 def analyze_project():
     """Analyze the current REAPER project and return its full state."""
+    if not REAPY_AVAILABLE or reapy is None:
+        return {"success": False, "error": "reapy not available"}
     with REAPY_LOCK:
         try:
-            # import reapy <-- Removed
             pass
     
         except Exception as e:

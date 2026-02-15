@@ -41,6 +41,90 @@ async function runCode(code, timeout = 60000) {
 }
 
 // ---------------------------------------------------------------------------
+// Live Voice FX Control (v1) — BOT_FX-only primitives
+// ---------------------------------------------------------------------------
+
+const BOT_FX_TRACK_NAME = 'BOT_FX';
+const BOTFX_MIN_ACTION_INTERVAL_MS = 150;
+let _lastBotFxActionAt = 0;
+
+function _botFxRateLimitGuard() {
+    const now = Date.now();
+    const dt = now - _lastBotFxActionAt;
+    if (dt >= 0 && dt < BOTFX_MIN_ACTION_INTERVAL_MS) {
+        return {
+            success: false,
+            error: `BOT_FX control is rate-limited. Try again in ${BOTFX_MIN_ACTION_INTERVAL_MS - dt}ms.`,
+        };
+    }
+    _lastBotFxActionAt = now;
+    return { success: true };
+}
+
+function _extractStdout(runCodeResult) {
+    if (!runCodeResult) return '';
+    return (
+        runCodeResult.output ??
+        runCodeResult.stdout ??
+        runCodeResult.out ??
+        ''
+    ).toString();
+}
+
+// Private helper (NOT a tool): resolve BOT_FX track index by case-insensitive name match.
+async function _findBotFxTrackIndex() {
+    const res = await runCode(`
+import reapy
+RPR = reapy.reascript_api
+target = ${JSON.stringify(BOT_FX_TRACK_NAME)}
+target_l = target.strip().lower()
+n = int(RPR.CountTracks(0))
+found = -1
+for i in range(n):
+    tr = RPR.GetTrack(0, i)
+    tup = RPR.GetSetMediaTrackInfo_String(tr, "P_NAME", "", False)
+    name = ""
+    if isinstance(tup, (list, tuple)):
+        if len(tup) >= 4:
+            name = tup[3] or ""
+        elif len(tup) >= 1:
+            name = tup[-1] or ""
+    else:
+        name = str(tup)
+    if (name or "").strip().lower() == target_l:
+        found = i
+        break
+if found >= 0:
+    print(f"TRACK_INDEX={found}")
+else:
+    print("TRACK_INDEX=")
+    `);
+
+    if (!res?.success) {
+        return {
+            success: false,
+            error: res?.error || `Failed to query REAPER via bridge at ${BRIDGE_URL}`,
+        };
+    }
+
+    const out = _extractStdout(res);
+    const m = /TRACK_INDEX=(\d+)/.exec(out);
+    if (!m) {
+        return {
+            success: false,
+            error: `BOT_FX track not found. Create a track named ${BOT_FX_TRACK_NAME}.`,
+        };
+    }
+
+    const track_index = Number.parseInt(m[1], 10);
+    if (!Number.isFinite(track_index)) {
+        return { success: false, error: 'Failed to parse BOT_FX track index.' };
+    }
+
+    return { success: true, track_index };
+}
+
+// ---------------------------------------------------------------------------
 // Tool implementations — each returns { success, output?, error? }
 // ---------------------------------------------------------------------------
 
@@ -219,6 +303,204 @@ track = RPR.GetTrack(0, ${track_index})
 RPR.TrackFX_SetEnabled(track, ${fx_index}, ${enabled ? 'True' : 'False'})
 print(f"FX ${fx_index} on track ${track_index} enabled=${enabled}")
     `);
+}
+
+// --- Live Voice FX Control (v1) tools ---
+
+async function getBotFxState() {
+    const trackRes = await _findBotFxTrackIndex();
+    if (!trackRes.success) return trackRes;
+
+    const res = await runCode(`
+import reapy, json
+RPR = reapy.reascript_api
+track_index = int(${trackRes.track_index})
+track = RPR.GetTrack(0, track_index)
+count = int(RPR.TrackFX_GetCount(track))
+fx = []
+for i in range(count):
+    name_t = RPR.TrackFX_GetFXName(track, i, "", 512)
+    name = ""
+    if isinstance(name_t, (list, tuple)):
+        if len(name_t) >= 4:
+            name = name_t[3] or ""
+        elif len(name_t) >= 1:
+            name = str(name_t[-1] or "")
+    else:
+        name = str(name_t)
+    enabled = bool(RPR.TrackFX_GetEnabled(track, i))
+    fx.append({"fx_index": i, "name": name, "enabled": enabled})
+print(json.dumps({"success": True, "track_index": track_index, "track_name": ${JSON.stringify(BOT_FX_TRACK_NAME)}, "fx": fx}))
+    `);
+
+    if (!res?.success) {
+        return { success: false, error: res?.error || 'Failed to read BOT_FX state.' };
+    }
+
+    const out = _extractStdout(res).trim();
+    const start = out.indexOf('{');
+    const end = out.lastIndexOf('}');
+    if (start === -1 || end === -1 || end <= start) {
+        return { success: false, error: `BOT_FX state returned non-JSON output: ${out.slice(0, 300)}` };
+    }
+
+    try {
+        return JSON.parse(out.slice(start, end + 1));
+    } catch (e) {
+        return { success: false, error: `Failed to parse BOT_FX state JSON: ${e.message}` };
+    }
+}
+
+async function setBotFxEnabled({ fx_index, enabled = true }) {
+    const guard = _botFxRateLimitGuard();
+    if (!guard.success) return guard;
+
+    const idx = Number.parseInt(fx_index, 10);
+    if (!Number.isFinite(idx) || idx < 0) {
+        return { success: false, error: 'fx_index must be an integer >= 0' };
+    }
+
+    const trackRes = await _findBotFxTrackIndex();
+    if (!trackRes.success) return trackRes;
+
+    const res = await toggleFx({ track_index: trackRes.track_index, fx_index: idx, enabled: !!enabled });
+    if (!res?.success) return { success: false, error: res?.error || 'Failed to toggle FX.' };
+
+    return {
+        success: true,
+        track_index: trackRes.track_index,
+        track_name: BOT_FX_TRACK_NAME,
+        fx_index: idx,
+        enabled: !!enabled,
+    };
+}
+
+async function toggleBotFxByName({ query, enabled = true }) {
+    const guard = _botFxRateLimitGuard();
+    if (!guard.success) return guard;
+
+    const q = (query ?? '').toString().trim();
+    if (!q) return { success: false, error: 'query is required (e.g. "valhalla")' };
+
+    const state = await getBotFxState();
+    if (!state?.success) return state;
+
+    const needle = q.toLowerCase();
+    const match = (state.fx || []).find((f) => (f?.name || '').toLowerCase().includes(needle));
+    if (!match) {
+        const available = (state.fx || []).map((f) => f?.name).filter(Boolean).slice(0, 20);
+        return {
+            success: false,
+            error: `No FX matched "${q}". Available: ${available.join(', ') || '(none)'}`,
+        };
+    }
+
+    return setBotFxEnabled({ fx_index: match.fx_index, enabled: !!enabled });
+}
+
+async function panicBotFx() {
+    const guard = _botFxRateLimitGuard();
+    if (!guard.success) return guard;
+
+    const trackRes = await _findBotFxTrackIndex();
+    if (!trackRes.success) return trackRes;
+
+    const res = await runCode(`
+import reapy
+RPR = reapy.reascript_api
+track_index = int(${trackRes.track_index})
+track = RPR.GetTrack(0, track_index)
+count = int(RPR.TrackFX_GetCount(track))
+for i in range(count):
+    RPR.TrackFX_SetEnabled(track, i, False)
+print(f"BYPASSED={count}")
+    `);
+
+    if (!res?.success) return { success: false, error: res?.error || 'Failed to bypass BOT_FX.' };
+    const out = _extractStdout(res);
+    const m = /BYPASSED=(\d+)/.exec(out);
+    const bypassed_count = m ? Number.parseInt(m[1], 10) : undefined;
+
+    return {
+        success: true,
+        track_index: trackRes.track_index,
+        track_name: BOT_FX_TRACK_NAME,
+        bypassed_count: Number.isFinite(bypassed_count) ? bypassed_count : null,
+    };
+}
+
+async function switchBotFxPreset({ preset_query, plugin_preset = '', disable_others = true }) {
+    const guard = _botFxRateLimitGuard();
+    if (!guard.success) return guard;
+
+    const query = (preset_query ?? '').toString().trim();
+    if (!query) {
+        return {
+            success: false,
+            error: 'preset_query is required (example: "reverb", "valhalla", "delay").',
+        };
+    }
+
+    const state = await getBotFxState();
+    if (!state?.success) return state;
+
+    const needle = query.toLowerCase();
+    const match = (state.fx || []).find((f) => (f?.name || '').toLowerCase().includes(needle));
+    if (!match) {
+        const available = (state.fx || []).map((f) => f?.name).filter(Boolean).slice(0, 20);
+        return {
+            success: false,
+            error: `No BOT_FX preset/FX matched "${query}". Available: ${available.join(', ') || '(none)'}`,
+        };
+    }
+
+    const presetName = (plugin_preset ?? '').toString().trim();
+    const res = await runCode(`
+import reapy
+RPR = reapy.reascript_api
+track_index = int(${state.track_index})
+target_fx = int(${match.fx_index})
+disable_others = ${disable_others ? 'True' : 'False'}
+preset_name = ${JSON.stringify(presetName)}
+track = RPR.GetTrack(0, track_index)
+count = int(RPR.TrackFX_GetCount(track))
+
+preset_ok = True
+if preset_name:
+    preset_ok = bool(RPR.TrackFX_SetPreset(track, target_fx, preset_name))
+
+for i in range(count):
+    if disable_others:
+        RPR.TrackFX_SetEnabled(track, i, bool(i == target_fx))
+    elif i == target_fx:
+        RPR.TrackFX_SetEnabled(track, i, True)
+
+print(f"SWITCHED={target_fx}")
+print(f"PRESET_OK={1 if preset_ok else 0}")
+    `);
+
+    if (!res?.success) {
+        return { success: false, error: res?.error || 'Failed to switch BOT_FX preset.' };
+    }
+
+    const out = _extractStdout(res);
+    const switched = /SWITCHED=(\d+)/.exec(out);
+    if (!switched) {
+        return { success: false, error: `Preset switch returned unexpected output: ${out.slice(0, 300)}` };
+    }
+    const presetOkMatch = /PRESET_OK=(\d+)/.exec(out);
+    const presetLoaded = presetOkMatch ? presetOkMatch[1] === '1' : null;
+
+    return {
+        success: true,
+        track_index: state.track_index,
+        track_name: BOT_FX_TRACK_NAME,
+        selected_fx_index: Number.parseInt(switched[1], 10),
+        selected_fx_name: match.name,
+        disable_others: !!disable_others,
+        plugin_preset: presetName || null,
+        plugin_preset_loaded: presetName ? presetLoaded : null,
+    };
 }
 
 async function deleteMidiItem({ track_index, item_index }) {
@@ -614,6 +896,13 @@ const TOOL_DISPATCH = {
     transcribe_to_midi: transcribeToMidi,
     insert_media_file: insertMediaFile,
     lookup_music_term: lookupMusicTerm,
+
+    // Live Voice FX Control (v1) — BOT_FX-only
+    get_botfx_state: getBotFxState,
+    set_botfx_enabled: setBotFxEnabled,
+    toggle_botfx_by_name: toggleBotFxByName,
+    panic_botfx: panicBotFx,
+    switch_botfx_preset: switchBotFxPreset,
 };
 
 // ---------------------------------------------------------------------------
@@ -1070,6 +1359,56 @@ const TOOL_SCHEMAS = [
                     position_is_beats: { type: 'boolean', description: 'If true, treat position as musical beats', default: false },
                 },
                 required: ['track_index', 'file_path'],
+            },
+        },
+    },
+    // -------------------------------------------------------------------
+    // Live Voice FX Control (v1) — BOT_FX-only tools
+    // -------------------------------------------------------------------
+    {
+        type: 'function',
+        function: {
+            name: 'get_botfx_state',
+            description: 'Live mode: return FX enabled/bypass state for the single designated track named BOT_FX.',
+            parameters: { type: 'object', properties: {} },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'toggle_botfx_by_name',
+            description: 'Live mode: enable/disable (bypass) the first FX on BOT_FX whose name contains the query substring (case-insensitive).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Substring to match, e.g. \"valhalla\"' },
+                    enabled: { type: 'boolean', description: 'true = enable FX, false = bypass FX', default: true },
+                },
+                required: ['query'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'panic_botfx',
+            description: 'Live mode: bypass ALL FX on BOT_FX immediately.',
+            parameters: { type: 'object', properties: {} },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'switch_botfx_preset',
+            description: 'Live mode preset switch on BOT_FX. Finds one FX by case-insensitive name substring, enables it, and optionally bypasses all others. Optionally load a plugin preset name on that FX before enabling.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    preset_query: { type: 'string', description: 'Name fragment to select target FX, e.g. "valhalla", "reverb", "delay"' },
+                    plugin_preset: { type: 'string', description: 'Optional plugin preset name to load on the matched FX (if supported by plugin)', default: '' },
+                    disable_others: { type: 'boolean', description: 'If true, bypass every other FX on BOT_FX (scene-style switching)', default: true },
+                },
+                required: ['preset_query'],
             },
         },
     },
