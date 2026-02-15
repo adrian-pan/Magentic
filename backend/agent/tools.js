@@ -244,16 +244,61 @@ print(f"Added {len(notes)} notes to track ${track_index} item ${item_index}")
 }
 
 async function addFx({ track_index, fx_name }) {
-    return runCode(`
+    const name = (fx_name ?? '').toString().trim();
+    if (!name) return { success: false, error: 'fx_name is required' };
+
+    // Heuristic aliases/fallbacks for common user phrases and naming mismatches.
+    const lower = name.toLowerCase();
+    const candidates = [name];
+    if (!lower.startsWith('vst3:')) candidates.push(`VST3: ${name}`);
+
+    const mentionsAutoTune = /auto[-\s]?tune/.test(lower);
+    if ((lower.includes('antares') && mentionsAutoTune)
+        || lower === 'auto-tune'
+        || lower === 'autotune') {
+        candidates.push('Auto-Tune Artist (Antares)');
+        candidates.push('VST3: Auto-Tune Artist (Antares)');
+    }
+
+    // De-dup while preserving order
+    const uniqueCandidates = [...new Set(candidates)];
+
+    const res = await runCode(`
 import reapy
 RPR = reapy.reascript_api
 track = RPR.GetTrack(0, int(${track_index}))
-fx_index = int(RPR.TrackFX_AddByName(track, ${JSON.stringify(fx_name)}, False, -1))
-if fx_index < 0:
-    print(f"ERROR: Plugin '${fx_name}' not found in REAPER. Check the exact name in the FX browser.")
+candidates = ${JSON.stringify(uniqueCandidates)}
+found_index = -1
+found_name = None
+for nm in candidates:
+    fx_index = int(RPR.TrackFX_AddByName(track, nm, False, -1))
+    if fx_index >= 0:
+        found_index = fx_index
+        found_name = nm
+        break
+
+if found_index >= 0:
+    print(f"ADD_FX_OK|{found_index}|{found_name}")
 else:
-    print(f"Added FX '${fx_name}' to track ${track_index} at FX index {fx_index}")
+    print("ADD_FX_ERR|NO_MATCH")
     `, 90000);
+
+    if (!res?.success) return { success: false, error: res?.error || 'add_fx bridge execution failed' };
+    const out = _extractStdout(res).trim();
+    const ok = /ADD_FX_OK\|(\d+)\|(.+)/.exec(out);
+    if (ok) {
+        return {
+            success: true,
+            output: `Added FX '${ok[2]}' to track ${track_index} at FX index ${ok[1]}`,
+            fx_index: Number.parseInt(ok[1], 10),
+            resolved_name: ok[2],
+        };
+    }
+
+    return {
+        success: false,
+        error: `Plugin '${name}' not found in REAPER. Try exact FX browser name (e.g. 'VST3: Auto-Tune Artist (Antares)').`,
+    };
 }
 
 async function setFxParam({ track_index, fx_index, param_name, value }) {
@@ -787,6 +832,50 @@ print(f"Cursor moved to ${position}s")
     `);
 }
 
+async function moveMediaItemByBeats({ track_index, item_index, beats }) {
+    const tr = Number.parseInt(track_index, 10);
+    const it = Number.parseInt(item_index, 10);
+    const deltaBeats = Number.parseFloat(beats);
+
+    if (!Number.isFinite(tr) || tr < 0) {
+        return { success: false, error: 'track_index must be an integer >= 0' };
+    }
+    if (!Number.isFinite(it) || it < 0) {
+        return { success: false, error: 'item_index must be an integer >= 0' };
+    }
+    if (!Number.isFinite(deltaBeats)) {
+        return { success: false, error: 'beats must be a valid number (positive = right, negative = left)' };
+    }
+
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+track_index = int(${tr})
+item_index = int(${it})
+delta_beats = float(${deltaBeats})
+
+n_tracks = int(RPR.CountTracks(0))
+if track_index < 0 or track_index >= n_tracks:
+    raise ValueError(f"Track index {track_index} out of range (0-{max(0, n_tracks-1)})")
+
+track = RPR.GetTrack(0, track_index)
+n_items = int(RPR.CountTrackMediaItems(track))
+if item_index < 0 or item_index >= n_items:
+    raise ValueError(f"Item index {item_index} out of range on track {track_index} (0-{max(0, n_items-1)})")
+
+item = RPR.GetTrackMediaItem(track, item_index)
+old_pos_sec = float(RPR.GetMediaItemInfo_Value(item, "D_POSITION"))
+old_qn = float(RPR.TimeMap2_timeToQN(0, old_pos_sec))
+new_qn = old_qn + delta_beats
+new_pos_sec = float(RPR.TimeMap2_QNToTime(0, new_qn))
+if new_pos_sec < 0:
+    new_pos_sec = 0.0
+RPR.SetMediaItemPosition(item, new_pos_sec, True)
+RPR.UpdateArrange()
+print(f"MOVED_ITEM track={track_index} item={item_index} old_sec={old_pos_sec:.6f} new_sec={new_pos_sec:.6f} beats={delta_beats}")
+    `);
+}
+
 async function insertMediaToTrack({ file_url, track_index = -1, track_name = 'Audio', position = 0 }) {
     const dlRes = await fetch(`${BRIDGE_URL}/download`, {
         method: 'POST',
@@ -1030,6 +1119,7 @@ const TOOL_DISPATCH = {
     play,
     stop,
     set_cursor_position: setCursorPosition,
+    move_media_item_by_beats: moveMediaItemByBeats,
     insert_media_to_track: insertMediaToTrack,
     separate_stems: separateStems,
     generate_stems: separateStems,
@@ -1488,6 +1578,22 @@ const TOOL_SCHEMAS = [
                     position: { type: 'number', description: 'Position in seconds' },
                 },
                 required: ['position'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'move_media_item_by_beats',
+            description: 'Move an existing media item left/right by a number of beats on a track. Positive beats move right, negative beats move left.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer', description: 'Track index containing the target media item (0-based)' },
+                    item_index: { type: 'integer', description: 'Item index on that track (0-based)' },
+                    beats: { type: 'number', description: 'Beat offset: +2 = move right 2 beats, -1 = move left 1 beat' },
+                },
+                required: ['track_index', 'item_index', 'beats'],
             },
         },
     },
