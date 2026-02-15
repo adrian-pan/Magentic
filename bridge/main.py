@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import traceback
+import threading
 from contextlib import redirect_stdout, redirect_stderr
 
 from fastapi import FastAPI
@@ -40,14 +41,37 @@ class StatusResponse(BaseModel):
     error: str = ""
 
 
+def _call_with_timeout(fn, timeout=5):
+    """Call fn() in a background thread with a timeout. Returns (result, error)."""
+    result = [None]
+    error = [None]
+
+    def target():
+        try:
+            result[0] = fn()
+        except Exception as e:
+            error[0] = str(e)
+
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        return None, "Timeout: REAPER did not respond"
+    return result[0], error[0]
+
+
 @app.get("/status", response_model=StatusResponse)
 def get_status():
     """Check if REAPER is reachable via reapy."""
     try:
         import reapy
         RPR = reapy.reascript_api
-        version = RPR.GetAppVersion()
-        return StatusResponse(reaper_connected=True, reaper_version=str(version))
+        version, err = _call_with_timeout(lambda: RPR.GetAppVersion(), timeout=5)
+        if err:
+            return StatusResponse(reaper_connected=False, error=err)
+        if version:
+            return StatusResponse(reaper_connected=True, reaper_version=version)
+        return StatusResponse(reaper_connected=False, error="Empty response from REAPER")
     except Exception as e:
         return StatusResponse(reaper_connected=False, error=str(e))
 
@@ -93,17 +117,66 @@ def execute_code(request: ExecuteRequest):
 
 
 _ANALYZE_SCRIPT = """
-import reapy, json as _json
-_RPR = reapy.reascript_api
-_n = _RPR.CountTracks(0)
-_tracks = []
-for _i in range(_n):
-    _t = _RPR.GetTrack(0, _i)
-    _fx = []
-    for _j in range(_RPR.TrackFX_GetCount(_t)):
-        _fx.append({"index":_j,"name":_RPR.TrackFX_GetFXName(_t,_j,"",256)[3],"is_enabled":_RPR.TrackFX_GetEnabled(_t,_j),"n_params":_RPR.TrackFX_GetNumParams(_t,_j)})
-    _tracks.append({"index":_i,"name":_RPR.GetSetMediaTrackInfo_String(_t,"P_NAME","",False)[3] or f"Track {_i+1}","volume":round(_RPR.GetMediaTrackInfo_Value(_t,"D_VOL"),3),"pan":round(_RPR.GetMediaTrackInfo_Value(_t,"D_PAN"),3),"is_muted":bool(_RPR.GetMediaTrackInfo_Value(_t,"B_MUTE")),"is_solo":bool(_RPR.GetMediaTrackInfo_Value(_t,"I_SOLO")),"is_armed":bool(_RPR.GetMediaTrackInfo_Value(_t,"I_RECARM")),"n_items":_RPR.CountTrackMediaItems(_t),"fx":_fx})
-print(_json.dumps({"success":True,"project":{"bpm":_RPR.Master_GetTempo(),"n_tracks":_n,"cursor_position":round(_RPR.GetCursorPosition(),3),"is_playing":bool(_RPR.GetPlayState()&1)},"tracks":_tracks}))
+import reapy, json
+try:
+    project = reapy.Project()
+    RPR = reapy.reascript_api
+    tracks_data = []
+    
+    # Iterate using reapy's object API which handles type conversion
+    for i, track in enumerate(project.tracks):
+        fx_list = []
+        # Accessing track.fxs is a generator or list proxy
+        try:
+            n_fx = RPR.TrackFX_GetCount(track)
+            for j in range(n_fx):
+                name = RPR.TrackFX_GetFXName(track, j, "", 256)[3]
+                is_enabled = bool(RPR.TrackFX_GetEnabled(track, j))
+                n_params = RPR.TrackFX_GetNumParams(track, j)
+                fx_list.append({
+                    "index": j,
+                    "name": name,
+                    "is_enabled": is_enabled,
+                    "n_params": n_params
+                })
+        except:
+            pass
+            
+        # Use RPR for reliable property access
+        name = RPR.GetSetMediaTrackInfo_String(track, "P_NAME", "", False)[3] or f"Track {i+1}"
+        vol = RPR.GetMediaTrackInfo_Value(track, "D_VOL")
+        pan = RPR.GetMediaTrackInfo_Value(track, "D_PAN")
+        muted = bool(RPR.GetMediaTrackInfo_Value(track, "B_MUTE"))
+        solo = bool(RPR.GetMediaTrackInfo_Value(track, "I_SOLO"))
+        armed = bool(RPR.GetMediaTrackInfo_Value(track, "I_RECARM"))
+        n_items = RPR.CountTrackMediaItems(track)
+
+        tracks_data.append({
+            "index": i,
+            "name": name,
+            "volume": round(vol, 3),
+            "pan": round(pan, 3),
+            "is_muted": muted,
+            "is_solo": solo,
+            "is_armed": armed,
+            "n_items": n_items,
+            "fx": fx_list
+        })
+
+    result = {
+        "success": True,
+        "project": {
+            "bpm": RPR.Master_GetTempo(),
+            "n_tracks": project.n_tracks,
+            "cursor_position": round(project.cursor_position, 3),
+            "is_playing": project.is_playing
+        },
+        "tracks": tracks_data
+    }
+    print(json.dumps(result))
+except Exception as e:
+    import traceback
+    print(json.dumps({"success": False, "error": str(e) + "\\n" + traceback.format_exc()}))
 """
 
 @app.get("/analyze")
