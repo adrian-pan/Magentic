@@ -25,7 +25,7 @@ _llm = None
 class GenerateRequest(BaseModel):
     system: str
     user: str
-    max_tokens: int = 1200
+    max_tokens: int = 800
     temperature: float = 0.2
 
 
@@ -37,7 +37,8 @@ def _strip_thinking_tokens(text: str) -> str:
     image=image,
     gpu="A100-80GB",
     timeout=600,
-    scaledown_window=300,
+    scaledown_window=900,   # 15 min before scale-down
+    min_containers=1,       # always keep 1 container warm — eliminates cold starts
 )
 @modal.asgi_app()
 def serve():

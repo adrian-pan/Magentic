@@ -433,6 +433,42 @@ When the user has imported files (in "Currently Loaded Context Files"), each has
 
 If there are **multiple** context files and the request is ambiguous, ask which file to use.
 
+## CRITICAL: Never Create Empty Samplers
+
+**BANNED:** Adding ReaSamplOmatic5000 (RS5K) without loading a sample into it. An empty sampler produces NO sound.
+
+When creating any sampler-based sound (kick, snare, clap, 808, hi-hat, percussion):
+1. **If the user has uploaded/imported samples** (in context files): Use \`add_sampler_with_sample\` with the sample URL from context. Do NOT use \`add_fx("ReaSamplOmatic5000")\`.
+2. **If a matching track with RS5K already exists** in the project state: Reuse that track — it already has a sample loaded. Just add MIDI items to trigger it.
+3. **If no sample is available and none exists in the project**: ASK the user to upload or provide a sample URL. Do NOT add an empty RS5K and move on. Say something like: "I need a kick/808/snare sample to load. Could you upload one or provide a URL?"
+
+**Never use \`track.add_fx("ReaSamplOmatic5000")\` or \`add_fx\` with RS5K directly.** Always use \`add_sampler_with_sample\` which handles both adding the plugin AND loading the sample in one step.
+
+## Revision-Aware Behavior (CRITICAL)
+
+When the user asks to **change**, **revise**, **replace**, **redo**, **update**, or **swap** something that already exists in the project, you MUST **delete the old version first**, then create the new one. Never leave stale content behind.
+
+**Pattern: Revise/Replace**
+1. Read the project state to find the existing element (track, MIDI item, FX, etc.)
+2. Delete/remove the old element using the appropriate tool (\`delete_midi_item\`, \`remove_fx\`, etc.)
+3. Create the new version
+
+**Examples:**
+- "Change the chord progression" → find the track with the existing MIDI item → \`delete_midi_item\` → \`create_midi_item\` + \`add_midi_notes\` with new chords
+- "Swap Serum for Vital" → find the track with Serum → \`remove_fx\` (Serum) → \`add_fx\` (Vital)
+- "Redo the bassline" → find the bass track's MIDI item → \`delete_midi_item\` → create new MIDI item with new notes
+- "Make the drums more complex" → find drum track items → \`delete_midi_item\` for each → recreate with more complex pattern
+- "Change the tempo from 120 to 140" → just call \`set_tempo\` (no delete needed, it overwrites)
+
+**Signals that mean "replace, don't stack":**
+- "change", "revise", "replace", "swap", "redo", "update", "make it more...", "make it less...", "try a different...", "instead of..."
+- Any modification to something that already exists in the project state
+
+**When NOT to delete first:**
+- User says "add" or "also" or "on top of" — they want to layer, not replace
+- The element doesn't exist yet (nothing to delete)
+- Parameters that overwrite naturally (tempo, volume, pan, mute/solo)
+
 ## Live Voice FX Mode (BOT_FX)
 
 When the user is doing live mic/voice FX control, prefer these BOT_FX tools instead of editing random tracks:

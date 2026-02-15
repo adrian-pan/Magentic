@@ -910,14 +910,20 @@ async function listStemsForSong({ song_name }) {
     }
 }
 
-async function transcribeToMidi({ file_url }) {
+async function transcribeToMidi({ file_url, source_type }) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
     try {
+        const body = { url: file_url };
+        if (source_type === 'vocal') {
+            body.onset_threshold = 0.3;
+            body.frame_threshold = 0.15;
+            body.minimum_note_length = 127;
+        }
         const res = await fetch(`${API_BASE}/api/functions/transcribe-to-midi`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: file_url }),
+            body: JSON.stringify(body),
             signal: controller.signal,
         });
         const data = await res.json();
@@ -1548,11 +1554,12 @@ const TOOL_SCHEMAS = [
         type: 'function',
         function: {
             name: 'transcribe_to_midi',
-            description: 'Transcribe an audio file to MIDI using AI (Basic Pitch). Uses RunPod GPU when configured. Requires file_url from context files. Returns URL to MIDI file in Supabase.',
+            description: 'Transcribe an audio file to MIDI using AI (Basic Pitch). Requires file_url from context files. Returns URL to MIDI file in Supabase. Set source_type to "vocal" for vocal stems (uses lower detection thresholds).',
             parameters: {
                 type: 'object',
                 properties: {
                     file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
+                    source_type: { type: 'string', enum: ['instrument', 'vocal'], description: 'Type of audio source. Use "vocal" for vocal stems to apply vocal-optimized detection thresholds. Default: instrument.' },
                 },
                 required: ['file_url'],
             },

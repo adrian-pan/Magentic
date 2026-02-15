@@ -80,6 +80,7 @@ MusicPlan schema (version 1):
 }
 
 Rules:
+- REVISION AWARE: When the user asks to change/revise/replace/redo something, reuse the SAME track names from the existing project context. The executor will automatically clean up old MIDI items and FX on matching tracks before applying your plan. Do NOT create duplicate tracks with new names — reuse existing names so the old content gets replaced.
 - Do NOT invent URLs. If an asset is missing, emit a need. Never guess or fabricate sample_url, midiUrl, or file URLs.
 - Every need must have an "id" field.
 - If no kick sample in assets for four-on-floor, emit need_kick and do not fabricate sample_url.
@@ -267,24 +268,38 @@ async function flashPlan(systemPrompt, userMsg) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system: systemPrompt, user: userMsg, max_tokens: 1200, temperature: 0.2 }),
+    body: JSON.stringify({ system: systemPrompt, user: userMsg, max_tokens: 800, temperature: 0.2 }),
   });
   if (!res.ok) throw new Error(`Flash planner error ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return normalizePlanShape(parseJsonFromContent(data.text || ''));
 }
 
+const REASONING_TIMEOUT = parseInt(process.env.REASONING_TIMEOUT_MS || '12000', 10);
+
 async function modalPlan(systemPrompt, userMsg) {
   if (!REASONING_MODAL_URL) throw new Error('REASONING_MODAL_URL (or legacy PLANNER_MODAL_URL) is required for REASONING_PROVIDER=modal');
   const url = `${REASONING_MODAL_URL.replace(/\/$/, '')}/generate`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system: systemPrompt, user: userMsg, max_tokens: 1200, temperature: 0.2 }),
-  });
-  if (!res.ok) throw new Error(`Modal planner error ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  return normalizePlanShape(parseJsonFromContent(data.text || ''));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REASONING_TIMEOUT);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system: systemPrompt, user: userMsg, max_tokens: 800, temperature: 0.2 }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`Modal planner error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return normalizePlanShape(parseJsonFromContent(data.text || ''));
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') {
+      throw new Error(`MODAL_TIMEOUT: Modal reasoning exceeded ${REASONING_TIMEOUT}ms`);
+    }
+    throw err;
+  }
 }
 
 async function planMusic(opts) {
@@ -303,7 +318,17 @@ async function planMusic(opts) {
   }
 
   if (REASONING_PROVIDER === 'flash') return flashPlan(PLANNER_SYSTEM, userMsg);
-  if (REASONING_PROVIDER === 'modal') return modalPlan(PLANNER_SYSTEM, userMsg);
+  if (REASONING_PROVIDER === 'modal') {
+    try {
+      return await modalPlan(PLANNER_SYSTEM, userMsg);
+    } catch (err) {
+      if (/MODAL_TIMEOUT|fetch failed|ECONNREFUSED/i.test(err.message)) {
+        console.warn(`[planMusic] Modal timed out/unreachable, falling back to OpenAI: ${err.message}`);
+        return openaiPlan(userMsg);
+      }
+      throw err;
+    }
+  }
   if (REASONING_PROVIDER === 'runpod_vllm') return runPodPlan(PLANNER_SYSTEM, userMsg);
   return openaiPlan(userMsg);
 }

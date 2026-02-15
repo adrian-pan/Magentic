@@ -14,6 +14,35 @@ function beatsToSeconds(beats, bpm) {
 }
 
 /**
+ * Find existing tracks in the project that match plan tracks by name or role.
+ * Returns a map: plan track name → existing track index (0-based).
+ */
+function findExistingTracks(planTracks, contextTracks) {
+    const matches = {};
+    if (!contextTracks || !planTracks) return matches;
+
+    for (const pt of planTracks) {
+        const planName = (pt.name || '').toLowerCase();
+        const planRole = (pt.role || '').toLowerCase();
+
+        for (const ct of contextTracks) {
+            const ctName = (ct.name || '').toLowerCase();
+            // Match by exact name, or name contains role keyword
+            if (ctName === planName || ctName.includes(planName) || planName.includes(ctName)) {
+                matches[pt.name] = ct.index;
+                break;
+            }
+            // Fallback: match by role keyword in track name
+            if (planRole && ctName.includes(planRole)) {
+                matches[pt.name] = ct.index;
+                break;
+            }
+        }
+    }
+    return matches;
+}
+
+/**
  * Execute a validated, unblocked MusicPlan.
  * @param {object} plan - Validated MusicPlan
  * @param {object} context - Normalized project state (for track index resolution)
@@ -42,14 +71,41 @@ async function executePlan(plan, context, assets) {
     // 1. Set tempo
     await run('set_tempo', { bpm });
 
-    // 2. Create tracks and record indices
+    // 1.5 Revision cleanup: find existing tracks that match plan tracks
+    // and delete their MIDI items + FX before recreating
+    const existingMatches = findExistingTracks(plan.tracks, context?.tracks);
+    for (const pt of plan.tracks || []) {
+        const existIdx = existingMatches[pt.name];
+        if (existIdx == null) continue;
+
+        const existTrack = (context?.tracks || []).find((t) => t.index === existIdx);
+        if (!existTrack) continue;
+
+        // Delete MIDI items in reverse order (so indices stay valid)
+        for (let itemIdx = (existTrack.n_items || 0) - 1; itemIdx >= 0; itemIdx--) {
+            await run('delete_midi_item', { track_index: existIdx, item_index: itemIdx });
+        }
+
+        // Remove FX in reverse order
+        for (let fxIdx = (existTrack.fx?.length || 0) - 1; fxIdx >= 0; fxIdx--) {
+            await run('remove_fx', { track_index: existIdx, fx_index: fxIdx });
+        }
+
+        // Reuse the existing track instead of creating a new one
+        trackIndexMap[pt.name] = existIdx;
+    }
+
+    // 2. Create tracks only for those that don't already exist
     const existingCount = context?.n_tracks ?? 0;
+    let newTrackOffset = 0;
     for (let i = 0; i < (plan.tracks || []).length; i++) {
         const track = plan.tracks[i];
-        const idx = existingCount + i;
+        if (trackIndexMap[track.name] != null) continue; // already matched & cleaned
+        const idx = existingCount + newTrackOffset;
         const r = await run('create_track', { name: track.name, index: -1 });
         if (r?.success !== false) {
             trackIndexMap[track.name] = idx;
+            newTrackOffset++;
         }
     }
 

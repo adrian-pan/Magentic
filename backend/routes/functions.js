@@ -12,7 +12,10 @@ const router = express.Router();
 const FUNCTIONS_DIR = path.join(__dirname, '..', 'functions');
 const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID;
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY;
-const USE_RUNPOD = !!(RUNPOD_ENDPOINT_ID && RUNPOD_API_KEY);
+const FUNCTIONS_MODAL_URL = process.env.FUNCTIONS_MODAL_URL;
+const FUNCTIONS_PROVIDER = process.env.FUNCTIONS_PROVIDER || (FUNCTIONS_MODAL_URL ? 'modal' : (RUNPOD_ENDPOINT_ID && RUNPOD_API_KEY ? 'runpod' : 'local'));
+const USE_RUNPOD = FUNCTIONS_PROVIDER === 'runpod' && !!(RUNPOD_ENDPOINT_ID && RUNPOD_API_KEY);
+const USE_MODAL = FUNCTIONS_PROVIDER === 'modal' && !!FUNCTIONS_MODAL_URL;
 
 function getTempDir() {
     const dir = path.join(require('os').tmpdir(), 'magentic', Date.now().toString());
@@ -100,6 +103,22 @@ async function callRunPod(action, inputUrl, extraInput = {}) {
     return data.output;
 }
 
+async function callModal(endpoint, body) {
+    const url = `${FUNCTIONS_MODAL_URL.replace(/\/$/, '')}/${endpoint}`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Modal functions error ${res.status}: ${err}`);
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+}
+
 // POST /api/functions/separate-stems
 router.post('/separate-stems', express.json(), async (req, res) => {
     const { url } = req.body || {};
@@ -117,7 +136,19 @@ router.post('/separate-stems', express.json(), async (req, res) => {
         }
 
         let stems;
-        if (USE_RUNPOD) {
+        if (USE_MODAL) {
+            const output = await callModal('separate-stems', {
+                input_url: url,
+                song_name: getSongNameFromUrl(url),
+                supabase_url: process.env.SUPABASE_URL,
+                supabase_service_key: process.env.SUPABASE_SERVICE_KEY,
+                bucket: 'magentic-files',
+            });
+            if (output.stem_urls && typeof output.stem_urls === 'object') {
+                return res.json({ success: true, stems: output.stem_urls });
+            }
+            stems = output.stems || {};
+        } else if (USE_RUNPOD) {
             const output = await callRunPod('separate_stems', url, {
                 supabase_url: process.env.SUPABASE_URL,
                 supabase_service_key: process.env.SUPABASE_SERVICE_KEY,
@@ -137,12 +168,12 @@ router.post('/separate-stems', express.json(), async (req, res) => {
             stems = result.stems || {};
         }
 
-        const songName = USE_RUNPOD ? getSongNameFromUrl(url) : path.basename(inputPath, path.extname(inputPath)).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const songName = (USE_MODAL || USE_RUNPOD) ? getSongNameFromUrl(url) : path.basename(inputPath, path.extname(inputPath)).replace(/[^a-zA-Z0-9_-]/g, '_');
         const uploaded = {};
 
         for (const [name, data] of Object.entries(stems)) {
-            const buf = USE_RUNPOD ? Buffer.from(data, 'base64') : fs.readFileSync(data);
-            const ext = USE_RUNPOD ? '.mp3' : path.extname(data);
+            const buf = (USE_MODAL || USE_RUNPOD) ? Buffer.from(data, 'base64') : fs.readFileSync(data);
+            const ext = (USE_MODAL || USE_RUNPOD) ? '.mp3' : path.extname(data);
             const storagePath = `${songName}/${name}${ext}`;
             const { url: stemUrl } = await uploadToBucket(storagePath, buf, 'audio/mpeg');
             uploaded[name] = stemUrl;
@@ -159,7 +190,7 @@ router.post('/separate-stems', express.json(), async (req, res) => {
 
 // POST /api/functions/transcribe-to-midi
 router.post('/transcribe-to-midi', express.json(), async (req, res) => {
-    const { url, songName: songNameParam } = req.body || {};
+    const { url, songName: songNameParam, onset_threshold, frame_threshold, minimum_note_length } = req.body || {};
     if (!url) {
         return res.status(400).json({ error: 'url is required' });
     }
@@ -174,7 +205,16 @@ router.post('/transcribe-to-midi', express.json(), async (req, res) => {
         }
 
         let buf, midiFilename;
-        if (USE_RUNPOD) {
+        if (USE_MODAL) {
+            const modalBody = { input_url: url };
+            if (onset_threshold != null) modalBody.onset_threshold = onset_threshold;
+            if (frame_threshold != null) modalBody.frame_threshold = frame_threshold;
+            if (minimum_note_length != null) modalBody.minimum_note_length = minimum_note_length;
+            const output = await callModal('transcribe-to-midi', modalBody);
+            if (!output.midi_base64) throw new Error('MIDI output not found');
+            buf = Buffer.from(output.midi_base64, 'base64');
+            midiFilename = output.filename || 'output_basic_pitch.mid';
+        } else if (USE_RUNPOD) {
             const output = await callRunPod('transcribe_to_midi', url);
             if (!output.midi_base64) throw new Error('MIDI output not found');
             buf = Buffer.from(output.midi_base64, 'base64');

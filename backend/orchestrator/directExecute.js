@@ -21,33 +21,24 @@ const { ensureProjectState, invalidateCache } = require('./projectCache');
 const MAX_TOOL_ROUNDS = 10;
 
 /**
- * Check if the request references project elements by name/index
- * (meaning we should pre-load project state for context).
- */
-function needsProjectState(userText) {
-    const t = (userText || '').toLowerCase();
-    return /track\s*\d|fx\s*\d|item\s*\d|which\s+track|current\s+(project|tracks|state)|analyze/i.test(t);
-}
-
-/**
  * Execute a "direct" intent via gpt-4o tool-calling (no planner).
  *
  * @param {object} opts
  * @param {string} opts.userText
  * @param {Array} opts.messages - Full conversation messages
  * @param {Array} [opts.contextFiles]
- * @param {boolean} [opts.includeProjectState]
  * @returns {Promise<{ message: object, toolResults?: object[], usage?: object }>}
  */
-async function directExecute({ userText, messages, contextFiles, includeProjectState }) {
+async function directExecute({ userText, messages, contextFiles }) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     // Build system message with optional context
     let contextBlock = '';
 
-    // Fetch project state via cache if needed
-    const shouldFetchState = includeProjectState || needsProjectState(userText);
-    if (shouldFetchState) {
+    // Always fetch project state — the model needs context about existing
+    // tracks, FX, and items to make good decisions (reuse vs create, ask
+    // for samples, revision cleanup, etc.). Cache makes this cheap (~50ms).
+    {
         const projectState = await ensureProjectState({ needed: true });
         if (projectState) {
             contextBlock += '\n\n## Current REAPER Project State\n';
@@ -151,4 +142,4 @@ async function directExecute({ userText, messages, contextFiles, includeProjectS
     };
 }
 
-module.exports = { directExecute, needsProjectState };
+module.exports = { directExecute };
