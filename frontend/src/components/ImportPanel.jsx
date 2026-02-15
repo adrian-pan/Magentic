@@ -10,12 +10,7 @@ function formatSize(bytes) {
 
 function getFileIcon(name) {
     const ext = name.split('.').pop().toLowerCase();
-    const icons = {
-        lua: '🟦', js: '🟨', py: '🐍', txt: '📄', md: '📝',
-        wav: '🎵', mp3: '🎵', json: '📋', xml: '📰', csv: '📊',
-        rpp: '🎛️', reapeaks: '📈',
-    };
-    return icons[ext] || '📁';
+    return `[${ext.toUpperCase()}]`;
 }
 
 export default function ImportPanel({ files, setFiles, onFilesChange }) {
@@ -100,9 +95,9 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
     return (
         <div className="import-panel panel">
             <div className="panel-header">
-                <span className="panel-title">📂 Import Module</span>
+                <span className="panel-title">DATA_IMPORT</span>
                 {files.length > 0 && (
-                    <span className="panel-badge">{files.length} files</span>
+                    <span className="panel-badge">CNT:{files.length}</span>
                 )}
             </div>
 
@@ -115,13 +110,13 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
                     onClick={() => fileInputRef.current?.click()}
                 >
                     <div className="drop-zone-icon">
-                        {uploading ? '⏳' : '📎'}
+                        {uploading ? '[...]' : '[+]'}
                     </div>
                     <div className="drop-zone-text">
-                        {uploading ? 'Uploading...' : 'Drop files here'}
+                        {uploading ? 'UPLOADING_DATA...' : 'INSERT_FILES'}
                     </div>
                     <div className="drop-zone-subtext">
-                        or click to browse
+                        CLICK_OR_DRAG
                     </div>
                     <input
                         ref={fileInputRef}
@@ -146,16 +141,17 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
                                     onClick={() => handleDelete(file.id)}
                                     title="Remove file"
                                 >
-                                    ✕
+                                    [DEL]
                                 </button>
                             </div>
                         ))}
                     </div>
                 ) : (
                     <div className="empty-state">
-                        <div className="empty-state-icon">📁</div>
+                        <div className="empty-state-icon">!</div>
                         <div className="empty-state-text">
-                            Import scripts, project files, or notes to add them to the agent's context window
+                            NO_DATA_LOADED<br />
+                            IMPORT_SCRIPTS_OR_NOTES
                         </div>
                     </div>
                 )}

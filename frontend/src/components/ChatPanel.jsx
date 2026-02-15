@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
+import Logo from '../components/Logo';
 
 const API_URL = 'http://localhost:3001';
 
 const SUGGESTIONS = [
-    'Analyze my project and suggest improvements',
-    'Add a new track called BASS',
-    'Help me mix this track',
-    'Set the tempo to 140 BPM',
+    'ANALYZE_PROJECT_STRUCTURE',
+    'CREATE_TRACK [NAME: BASS]',
+    'MIX_TRACK [TARGET: CURRENT]',
+    'SET_BPM [VALUE: 140]',
 ];
 
 export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
@@ -139,20 +140,20 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                 return (
                     <div key={i} className="executable-block">
                         <div className="executable-header">
-                            <span className="executable-label">⚡ Executable</span>
+                            <span className="executable-label">[EXEC_BLOCK]</span>
                             <button
                                 className={`execute-btn ${isExecuting ? 'executing' : ''} ${result?.success ? 'success' : ''} ${result && !result.success ? 'error' : ''}`}
                                 onClick={() => executeCode(code, blockId)}
                                 disabled={isExecuting}
                             >
-                                {isExecuting ? '⏳ Running...' : result?.success ? '✅ Re-run' : result ? '❌ Retry' : '▶ Execute in REAPER'}
+                                {isExecuting ? '[RUNNING...]' : result?.success ? '[RE-RUN]' : result ? '[RETRY]' : '[EXECUTE]'}
                             </button>
                         </div>
                         <pre><code>{code}</code></pre>
                         {result && (
                             <div className={`execute-result ${result.success ? 'success' : 'error'}`}>
                                 <div className="execute-result-header">
-                                    {result.success ? '✅ Output' : '❌ Error'}
+                                    {result.success ? '>> STDOUT' : '>> STDERR'}
                                 </div>
                                 <pre>{result.output || result.error}</pre>
                             </div>
@@ -188,18 +189,17 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
     return (
         <div className="chat-panel panel">
             <div className="panel-header">
-                <span className="panel-title">🤖 AI Agent</span>
+                <span className="panel-title">MAGENTIC_CORE</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {reaperStatus && (
                         <div className={`reaper-status ${reaperStatus.reaper_connected ? 'connected' : 'disconnected'}`}>
-                            <div className={`reaper-dot ${reaperStatus.reaper_connected ? '' : 'offline'}`} />
                             {reaperStatus.reaper_connected
-                                ? `REAPER ${reaperStatus.reaper_version}`
-                                : 'REAPER Offline'}
+                                ? `[LINK: ACTIVE] v${reaperStatus.reaper_version}`
+                                : '[LINK: OFFLINE]'}
                         </div>
                     )}
                     {messages.length > 0 && (
-                        <span className="panel-badge">{messages.length} messages</span>
+                        <span className="panel-badge">MSG:{messages.length}</span>
                     )}
                 </div>
             </div>
@@ -207,11 +207,13 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
             <div className="chat-messages">
                 {messages.length === 0 && !isLoading ? (
                     <div className="welcome-container">
-                        <div className="welcome-icon">🧲</div>
-                        <h2 className="welcome-title">Welcome to Magentic</h2>
+                        <div className="welcome-icon">
+                            <Logo size={64} />
+                        </div>
+                        <h2 className="welcome-title">SYSTEM_READY</h2>
                         <p className="welcome-subtitle">
-                            Your project-aware AI production assistant. I can read your REAPER session,
-                            analyze it like a mix engineer, and execute multi-step production plans.
+                            MAGENTIC_OS v1.0 INITIALIZED.<br />
+                            AWAITING INPUT FOR AUDIO SEQUENCING OPERATIONS.
                         </p>
                         <div className="welcome-chips">
                             {SUGGESTIONS.map((s) => (
@@ -230,7 +232,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         {messages.map((msg, i) => (
                             <div key={i} className={`message ${msg.role}`}>
                                 <div className="message-avatar">
-                                    {msg.role === 'user' ? '👤' : '🧲'}
+                                    {msg.role === 'user' ? 'USR' : 'SYS'}
                                 </div>
                                 <div className="message-bubble">
                                     {renderContent(msg.content, i)}
@@ -239,7 +241,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         ))}
                         {isLoading && (
                             <div className="message assistant">
-                                <div className="message-avatar">🧲</div>
+                                <div className="message-avatar">SYS</div>
                                 <div className="message-bubble">
                                     <div className="typing-indicator">
                                         <div className="typing-dot" />
@@ -256,7 +258,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
 
             {error && (
                 <div className="error-banner">
-                    ⚠️ {error}
+                    [ERROR] {error}
                 </div>
             )}
 
@@ -265,30 +267,32 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     <textarea
                         ref={textareaRef}
                         className="chat-input"
-                        placeholder="Ask Magentic to analyze, modify, or mix your REAPER project..."
+                        placeholder="ENTER_COMMAND..."
                         value={input}
                         onChange={(e) => { setInput(e.target.value); autoResize(); }}
                         onKeyDown={handleKeyDown}
                         rows={1}
                     />
+                </div>
+                <div className="chat-controls">
+                    {contextFiles && contextFiles.length > 0 && (
+                        <div className="chat-context-bar">
+                            ATTACHMENTS:
+                            {contextFiles.map((f) => (
+                                <span key={f.id} className="context-file-tag">
+                                    [{f.name}]
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     <button
                         className="chat-send-btn"
                         onClick={() => sendMessage()}
                         disabled={!input.trim() || isLoading}
                     >
-                        ↑
+                        [TRANSMIT]
                     </button>
                 </div>
-                {contextFiles && contextFiles.length > 0 && (
-                    <div className="chat-context-bar">
-                        📎 Context:
-                        {contextFiles.map((f) => (
-                            <span key={f.id} className="context-file-tag">
-                                {f.name}
-                            </span>
-                        ))}
-                    </div>
-                )}
             </div>
         </div>
     );

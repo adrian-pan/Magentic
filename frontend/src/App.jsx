@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel';
 import ImportPanel from './components/ImportPanel';
+import Logo from './components/Logo';
 
 const API_URL = 'http://localhost:3001';
 
@@ -41,12 +42,11 @@ export default function App() {
       {/* Header */}
       <header className="app-header">
         <div className="app-logo">
-          <div className="app-logo-icon">🧲</div>
-          <span className="app-logo-text">Magentic</span>
+          <Logo size={28} />
+          <span className="app-logo-text">MAGENTIC_OS</span>
         </div>
         <div className="app-status">
-          <div className="status-dot" />
-          Agent Online
+          <span className="status-text">[SYSTEM: ONLINE]</span>
         </div>
       </header>
 
@@ -63,13 +63,13 @@ export default function App() {
           {/* Project State Panel */}
           <div className="project-panel">
             <div className="panel-header">
-              <span className="panel-title">🎛️ REAPER Project</span>
+              <span className="panel-title">PRJ_STATE</span>
               <button
                 className="analyze-btn"
                 onClick={analyzeProject}
                 disabled={isAnalyzing}
               >
-                {isAnalyzing ? '⏳' : '🔄'} {isAnalyzing ? 'Scanning...' : 'Refresh'}
+                {isAnalyzing ? '[SCANNING...]' : '[REFRESH]'}
               </button>
             </div>
             <div className="project-content">
@@ -77,19 +77,19 @@ export default function App() {
                 <>
                   <div className="project-info">
                     <div className="project-info-item">
-                      <span className="project-info-label">Project</span>
-                      <span className="project-info-value">{projectState.project.name || 'Untitled'}</span>
+                      <span className="project-info-label">PROJECT_NAME</span>
+                      <span className="project-info-value">{projectState.project.name || 'UNTITLED'}</span>
                     </div>
                     <div className="project-info-item">
                       <span className="project-info-label">BPM</span>
                       <span className="project-info-value">{projectState.project.bpm}</span>
                     </div>
                     <div className="project-info-item">
-                      <span className="project-info-label">Tracks</span>
+                      <span className="project-info-label">TRACK_COUNT</span>
                       <span className="project-info-value">{projectState.project.n_tracks}</span>
                     </div>
                     <div className="project-info-item">
-                      <span className="project-info-label">Length</span>
+                      <span className="project-info-label">DURATION</span>
                       <span className="project-info-value">{Math.floor(projectState.project.length / 60)}:{String(Math.floor(projectState.project.length % 60)).padStart(2, '0')}</span>
                     </div>
                   </div>
@@ -97,16 +97,16 @@ export default function App() {
                     <div className="track-list">
                       {projectState.tracks.map((track, i) => (
                         <div key={i} className={`track-item ${track.is_muted ? 'muted' : ''}`}>
-                          <div className="track-name">{track.name}</div>
+                          <div className="track-name">{track.name.toUpperCase()}</div>
                           <div className="track-meta">
                             {track.fx.length > 0 && (
-                              <span className="track-fx-count">{track.fx.length} FX</span>
+                              <span className="track-fx-count">FX:{track.fx.length}</span>
                             )}
                             {track.n_items > 0 && (
-                              <span className="track-items-count">{track.n_items} items</span>
+                              <span className="track-items-count">ITM:{track.n_items}</span>
                             )}
-                            {track.is_muted && <span className="track-muted-badge">M</span>}
-                            {track.is_solo && <span className="track-solo-badge">S</span>}
+                            {track.is_muted && <span className="track-muted-badge">[M]</span>}
+                            {track.is_solo && <span className="track-solo-badge">[S]</span>}
                           </div>
                         </div>
                       ))}
@@ -114,10 +114,12 @@ export default function App() {
                   )}
                 </>
               ) : (
-                <div className="empty-state" style={{ padding: '20px 16px' }}>
-                  <div className="empty-state-icon">🎛️</div>
+                <div className="empty-state">
+                  <div className="empty-state-icon">!</div>
                   <div className="empty-state-text">
-                    Connect to REAPER to see your project state. Start the bridge: <code>cd bridge && python main.py</code>
+                    [NO_CONNECTION]<br />
+                    INITIATE BRIDGE SEQUENCER<br />
+                    <code>cd bridge && python main.py</code>
                   </div>
                 </div>
               )}
