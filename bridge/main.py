@@ -150,7 +150,7 @@ for _i in range(_n):
         _it = _RPR.GetTrackMediaItem(_t, _k)
         _items.append({"index":_k,"position":round(float(_RPR.GetMediaItemInfo_Value(_it,"D_POSITION")),3),"length":round(float(_RPR.GetMediaItemInfo_Value(_it,"D_LENGTH")),3)})
     _tracks.append({"index":_i,"name":_RPR.GetSetMediaTrackInfo_String(_t,"P_NAME","",False)[3] or f"Track {_i+1}","volume":round(_RPR.GetMediaTrackInfo_Value(_t,"D_VOL"),3),"pan":round(_RPR.GetMediaTrackInfo_Value(_t,"D_PAN"),3),"is_muted":bool(_RPR.GetMediaTrackInfo_Value(_t,"B_MUTE")),"is_solo":bool(_RPR.GetMediaTrackInfo_Value(_t,"I_SOLO")),"is_armed":bool(_RPR.GetMediaTrackInfo_Value(_t,"I_RECARM")),"n_items":_ni,"items":_items,"fx":_fx})
-print(_json.dumps({"success":True,"project":{"bpm":_RPR.Master_GetTempo(),"n_tracks":_n,"cursor_position":round(_RPR.GetCursorPosition(),3),"is_playing":bool(_RPR.GetPlayState()&1)},"tracks":_tracks}))
+print(_json.dumps({"success":True,"project":{"bpm":_RPR.Master_GetTempo(),"n_tracks":_n,"cursor_position":round(_RPR.GetCursorPosition(),3),"length":round(_RPR.GetProjectLength(0), 3),"is_playing":bool(_RPR.GetPlayState()&1)},"tracks":_tracks}))
 """
 
 @app.get("/analyze")
