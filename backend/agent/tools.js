@@ -400,6 +400,43 @@ async function transcribeToMidi({ file_url }) {
 }
 
 // ---------------------------------------------------------------------------
+// Local File Import Tool (requires local path from context)
+// ---------------------------------------------------------------------------
+
+async function insertMediaFile({ track_index, file_path, position = -1, position_is_beats = false }) {
+    return runCode(`
+import reapy, os
+RPR = reapy.reascript_api
+path = ${JSON.stringify(file_path)}
+if not os.path.exists(path):
+    print(f"Error: File not found at {path}")
+else:
+    n_tracks = RPR.CountTracks(0)
+    if ${track_index} < 0 or ${track_index} >= n_tracks:
+        print(f"Error: Track {track_index} out of bounds (0-{n_tracks-1})")
+    else:
+        track = RPR.GetTrack(0, int(${track_index}))
+        RPR.SetOnlyTrackSelected(track)
+        
+        pos = ${position}
+        if pos >= 0:
+            if ${position_is_beats ? 'True' : 'False'}:
+                # Convert beats to time
+                pos = RPR.TimeMap2_beatsToTime(0, pos, 0)
+            
+            RPR.SetEditCurPos(pos, True, False)
+        
+        # 0 = add to track, insert at edit cursor
+        result = RPR.InsertMedia(path, 0) 
+        
+        if result:
+            print(f"Inserted {os.path.basename(path)} on track ${track_index}")
+        else:
+            print(f"Failed to insert media. Check format/path.")
+    `);
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatch map
 // ---------------------------------------------------------------------------
 
@@ -426,6 +463,8 @@ const TOOL_DISPATCH = {
     generate_stems: separateStems,
     list_stems_for_song: listStemsForSong,
     transcribe_to_midi: transcribeToMidi,
+    transcribe_to_midi: transcribeToMidi,
+    insert_media_file: insertMediaFile,
 };
 
 // ---------------------------------------------------------------------------
@@ -757,6 +796,23 @@ const TOOL_SCHEMAS = [
                     file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
                 },
                 required: ['file_url'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'insert_media_file',
+            description: 'Insert an audio or MIDI file from a local path onto a track at a specific time or beat position.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer' },
+                    file_path: { type: 'string', description: 'Absolute path to the file' },
+                    position: { type: 'number', description: 'Start position in seconds (default) or beats (if position_is_beats=true)', default: -1 },
+                    position_is_beats: { type: 'boolean', description: 'If true, treat position as musical beats', default: false },
+                },
+                required: ['track_index', 'file_path'],
             },
         },
     },

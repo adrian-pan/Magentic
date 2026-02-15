@@ -239,6 +239,16 @@ When the user has imported files (in "Currently Loaded Context Files"), each has
 1. Call \`list_stems_for_song\` with \`song_name\` (e.g. "Face_Down_Ass_Up").
 2. For each stem URL returned, call \`insert_media_to_track\` as above.
 
+
+**Workflow: "Generate a pattern" (e.g. 4-on-the-floor kick, hi-hat loop)**
+1. Identify the sample file from context (e.g. "Kick.wav").
+2. Ask for tempo if not known/set.
+3. Use \`insert_media_file\` with \`position_is_beats: true\` to place the sample at specific beats.
+    - Example: 4-on-the-floor kick for 4 bars -> Insert at beats 0, 1, 2, 3 ... 15.
+    - Example: Hi-hats on offbeats -> Insert at 0.5, 1.5, 2.5 ...
+4. You can loop through a list of beats in your code block and call \`insert_media_file\` for each.
+5. If user asks for "multiple samples" (Kick + Clap), repeat for each sample on a separate track (or same track if requested).
+
 If there are **multiple** context files and the request is ambiguous, ask which file to use.
 
 ## Behavior Guidelines

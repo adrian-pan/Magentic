@@ -2,6 +2,7 @@ const express = require('express');
 const OpenAI = require('openai');
 const { SYSTEM_PROMPT } = require('../agent/systemPrompt');
 const { TOOL_SCHEMAS, TOOL_DISPATCH } = require('../agent/tools');
+const fileStore = require('../lib/fileStore');
 
 const router = express.Router();
 
@@ -50,10 +51,17 @@ router.post('/', async (req, res) => {
         if (contextFiles && contextFiles.length > 0) {
             contextBlock += '\n\n## Currently Loaded Context Files\n';
             contextFiles.forEach((file) => {
+                // Try to resolve the full file record from store to get the local path
+                const storeRecord = file.id ? fileStore.getById(file.id) : null;
+                const localPath = storeRecord ? storeRecord.storagePath : null;
+
                 if (file.content != null && file.content !== '') {
                     contextBlock += `\n### ${file.name}\n\`\`\`\n${file.content}\n\`\`\`\n`;
-                } else if (file.url) {
-                    contextBlock += `\n### ${file.name}\n- Type: ${file.type || 'binary'}\n- URL: ${file.url}\n`;
+                } else {
+                    contextBlock += `\n### ${file.name}\n`;
+                    if (localPath) contextBlock += `- Local Path: ${localPath}\n`;
+                    if (file.url) contextBlock += `- URL: ${file.url}\n`;
+                    contextBlock += `- Type: ${file.type || 'binary'}\n`;
                 }
             });
         }
