@@ -9,23 +9,6 @@ export default function App() {
   const [contextFiles, setContextFiles] = useState([]);
   const [projectState, setProjectState] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [reaperStatus, setReaperStatus] = useState(null);
-
-  // Poll REAPER connection status every 10 seconds
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/reaper/status`);
-        const data = await res.json();
-        setReaperStatus(data);
-      } catch {
-        setReaperStatus({ reaper_connected: false, error: 'Backend unreachable' });
-      }
-    };
-    checkStatus();
-    const interval = setInterval(checkStatus, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   const analyzeProject = useCallback(async () => {
     setIsAnalyzing(true);
@@ -53,8 +36,6 @@ export default function App() {
     );
   };
 
-  const isOnline = reaperStatus?.reaper_connected === true;
-
   return (
     <div className="app-container">
       {/* Header */}
@@ -64,8 +45,8 @@ export default function App() {
           <span className="app-logo-text">Magentic</span>
         </div>
         <div className="app-status">
-          <div className={`status-dot ${isOnline ? '' : 'offline'}`} />
-          {isOnline ? 'Agent Online' : 'Agent Offline'}
+          <div className="status-dot" />
+          Agent Online
         </div>
       </header>
 
