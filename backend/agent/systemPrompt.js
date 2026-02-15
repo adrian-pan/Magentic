@@ -248,6 +248,12 @@ if melody_track and melody_track.n_items > 0:
             info = note.infos  # Most efficient: gets all props in one call
             print(f"pitch={info['pitch']} start={info['start']:.3f} end={info['end']:.3f} vel={info['velocity']}")
 
+# Drum pattern: clap on beats 2 and 4 (every other beat / backbeat)
+# Kick on 1,2,3,4; clap on 2,4 only. For 4 bars: clap at 1,3,5,7,9,11,13,15 (beat indices)
+for bar in range(4):
+    for off in [1, 3]:  # beat 2 and 4 of bar (0-indexed: 1, 3)
+        take.add_note(start=bar*4 + off, end=bar*4 + off + 0.1, pitch=38, velocity=95, unit='beats', sort=False)
+
 # Add chord progression to synth/instrument track (I-V-vi-IV example)
 # MUST check tracks exist first — never use project.tracks[-1] without this
 if len(project.tracks) == 0:
@@ -292,12 +298,13 @@ When the user has imported files (in "Currently Loaded Context Files"), each has
 - **\`separate_stems\`** (or **\`generate_stems\`**) — Split audio into stems (drums, bass, vocals, other). Loads stems into Supabase at **\`{songName}/{stemName}.mp3\`** (e.g. \`Face_Down_Ass_Up/drums.mp3\`). Returns \`stems\` object with public URLs. Use when the user asks to "create stems" or "split the track".
 - **\`list_stems_for_song\`** — Retrieve stem URLs from Supabase for a song. Use when the user asks to "import stems from X" and stems were already generated. Stems are stored at \`{songName}/{stemName}.mp3\`.
 - **\`insert_media_to_track\`** — Add an audio file as a visible waveform on the timeline (same as imported files). Use for stems, imported files, etc. **Always use \`track_index: -1\`** to create a NEW dedicated track — never add pattern/sample audio to an existing instrument track.
-- **\`create_four_on_the_floor_pattern\`** — Create a new track, add the kick/sample audio, and duplicate it in a 4-on-the-floor pattern (4 hits per bar). Use when the user asks for a "four on the floor" or "4-on-the-floor" kick pattern.
+- **\`add_sampler_with_sample\`** — Add ReaSamplOmatic5000 to a track and load a sample so MIDI notes trigger it. Use when you have MIDI items (clap, hihat, snare) but no sound because the track has no instrument.
 - **\`transcribe_to_midi\`** — Convert audio to MIDI. Returns MIDI URL.
 
-**Workflow: "Make a four-on-the-floor kick pattern" (user imported a kick sample)**
-1. Call \`create_four_on_the_floor_pattern\` with the kick's \`url\` from context files, \`track_name\` = "Kick Pattern" (or similar), \`num_bars\` = 4. This creates a dedicated track and places the kick on beats 0,1,2,3 of each bar.
-2. Do NOT add the kick to an existing instrument track (e.g. Serum). Each pattern element gets its own track.
+**Workflow: "MIDI items have no sound" (clap, hihat, etc. on a track but silent)**
+1. Identify the track with the MIDI items and its index from project state.
+2. Call \`add_sampler_with_sample\` with a sample URL (e.g. clap, hihat from context files or a known sample URL), \`track_index\` = the track index, \`track_name\` = appropriate name (e.g. "Clap", "Hihat"). This adds ReaSamplOmatic5000 and loads the sample so MIDI triggers it.
+3. If no sample is in context, use a suitable sample URL or ask the user for one.
 
 **Workflow: "Create stems and import onto mixer tracks"**
 1. Call \`separate_stems\` (or \`generate_stems\`) with the context file URL. Stems are saved to Supabase at \`{songName}/{stemName}.mp3\`.

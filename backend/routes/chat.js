@@ -3,6 +3,10 @@ const OpenAI = require('openai');
 const { SYSTEM_PROMPT } = require('../agent/systemPrompt');
 const { TOOL_SCHEMAS, TOOL_DISPATCH } = require('../agent/tools');
 const fileStore = require('../lib/fileStore');
+const { wantsExecution } = require('../services/orchestrator');
+const { planWithRepair } = require('../musicPlan/planWithRepair');
+const { executePlan } = require('../musicPlan/executor');
+const { normalizeProjectState } = require('../musicPlan/normalizeProjectState');
 
 const router = express.Router();
 
@@ -20,6 +24,20 @@ async function getProjectState() {
     }
 }
 
+// Build assets from contextFiles (lazy stems/midi until planner emits need)
+function buildAssets(contextFiles) {
+    const uploaded_files = (contextFiles || []).map((f) => ({
+        name: f.name,
+        url: f.url,
+        type: f.type || 'binary',
+    })).filter((f) => f.url);
+    return {
+        uploaded_files,
+        stems: null,
+        midi: [],
+    };
+}
+
 // Max tool-call rounds to prevent infinite loops
 const MAX_TOOL_ROUNDS = 10;
 
@@ -30,6 +48,48 @@ router.post('/', async (req, res) => {
 
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({ error: 'messages array is required' });
+        }
+
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+        const userText = lastUserMsg?.content?.trim() || '';
+
+        if (wantsExecution(userText)) {
+            const rawContext = await getProjectState();
+            const assets = buildAssets(contextFiles);
+            const result = await planWithRepair({
+                userText,
+                rawContext,
+                assets,
+            });
+
+            if (result.blocked) {
+                const lines = result.missing?.length > 0
+                    ? ['I can do this, but I need:']
+                    : ['I couldn\'t create a valid plan.'];
+                result.suggestedQuestions?.forEach((q) => lines.push(`• ${q}`));
+                if (result.missing?.length > 0) {
+                    lines.push('', 'Reply with one of:', '• "Use this kick: <url>"', '• "Use stems from: <song_name>"', '• "Skip drums for now"');
+                }
+                return res.json({
+                    message: { role: 'assistant', content: lines.join('\n') },
+                    toolResults: [],
+                    blocked: true,
+                    needs: result.missing || [],
+                });
+            }
+
+            if (result.plan && !result.blocked) {
+                const context = result.context || normalizeProjectState(rawContext);
+                const execResults = await executePlan(result.plan, context, result.assets || assets);
+                const successCount = execResults.filter((r) => r.result?.success !== false).length;
+                return res.json({
+                    message: {
+                        role: 'assistant',
+                        content: `Executed plan: ${successCount} tool calls completed. Check REAPER for results.`,
+                    },
+                    toolResults: execResults.map((r) => ({ tool: r.tool, input: r.args, result: r.result })),
+                });
+            }
         }
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

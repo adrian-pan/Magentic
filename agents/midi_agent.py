@@ -37,6 +37,8 @@ Rules:
 - Use velocities: drums 80–110, melodic 60–100, accents up to 120.
 - When creating a drum pattern, use one MIDI item that covers the full
   loop length and pack all drum hits into it.
+- Clap/snare (pitch 38): place on beats 2 and 4 of each bar (every other beat,
+  the backbeat). Do NOT put clap on every kick beat — only on 2 and 4.
 - Think step-by-step before calling tools. Be precise with note numbers
   and timing math.
 """

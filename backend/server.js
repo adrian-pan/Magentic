@@ -27,8 +27,10 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:5001';
+
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`\n🧲 Magentic Backend running on http://localhost:${PORT}`);
     console.log(`   API endpoints:`);
     console.log(`   POST /api/chat          — Chat with the AI agent`);
@@ -45,4 +47,29 @@ app.listen(PORT, () => {
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith('sk-your')) {
         console.log(`   ⚠️  No valid OPENAI_API_KEY found. Create backend/.env with your key.\n`);
     }
+
+    try {
+        const bridgeRes = await fetch(`${BRIDGE_URL}/status`);
+        const bridgeData = await bridgeRes.json();
+        if (bridgeData.reaper_connected) {
+            console.log(`   ✓ Bridge at ${BRIDGE_URL} — REAPER connected`);
+        } else {
+            console.log(`   ⚠ Bridge at ${BRIDGE_URL} — REAPER not connected. Start bridge: cd bridge && python main.py`);
+        }
+    } catch {
+        console.log(`   ⚠ Bridge at ${BRIDGE_URL} unreachable. Start it with: cd bridge && python main.py`);
+    }
+
+    try {
+        const { checkPlannerHealth } = require('./musicPlan/plannerClient');
+        const plannerHealth = await checkPlannerHealth();
+        if (plannerHealth.ok) {
+            console.log(`   ✓ Planner (${plannerHealth.provider}) — ready`);
+        } else {
+            console.log(`   ⚠ Planner (${plannerHealth.provider}) — ${plannerHealth.error || 'unreachable'}`);
+        }
+    } catch (e) {
+        console.log(`   ⚠ Planner health check failed: ${e.message}`);
+    }
+    console.log('');
 });

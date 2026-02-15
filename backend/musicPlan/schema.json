@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://magentic.app/musicPlan/v1",
+  "title": "MusicPlan",
+  "description": "Structured music production plan for REAPER execution",
+  "type": "object",
+  "required": ["version", "transport", "tracks"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "genre": { "type": "string" },
+        "mood": { "type": "string" },
+        "reference": { "type": "string" }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "required": ["tempo_bpm", "time_signature", "key", "bar_count"],
+      "properties": {
+        "tempo_bpm": { "type": "number", "minimum": 20, "maximum": 300 },
+        "time_signature": { "type": "string", "pattern": "^\\d+/\\d+$" },
+        "key": { "type": "string" },
+        "bar_count": { "type": "integer", "minimum": 1, "maximum": 128 }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "role"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "role": {
+            "type": "string",
+            "enum": ["harmony", "bass", "melody", "drums", "audio", "fx"]
+          },
+          "instrument_hint": { "type": "string" },
+          "midi": {
+            "type": "object",
+            "properties": {
+              "clips": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["start_beat", "length_beats", "events"],
+                  "properties": {
+                    "start_beat": { "type": "number", "minimum": 0 },
+                    "length_beats": { "type": "number", "minimum": 0.25 },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["type", "start_beat"],
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["chord", "note", "automation_hint"]
+                          },
+                          "symbol": { "type": "string" },
+                          "start_beat": { "type": "number", "minimum": 0 },
+                          "length_beats": { "type": "number", "minimum": 0 },
+                          "octave": { "type": "integer" },
+                          "voicing": {
+                            "type": "string",
+                            "enum": ["close", "open", "drop2"]
+                          },
+                          "borrowed": { "type": "boolean" },
+                          "pitch": { "type": "integer" },
+                          "velocity": { "type": "integer", "minimum": 0, "maximum": 127 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "audio_pattern": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["four_on_floor", "import_audio"]
+              },
+              "sample_url": { "type": "string" },
+              "bars": { "type": "integer" },
+              "start_beat": { "type": "number" },
+              "position_seconds": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "needs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "required", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "kick_sample_url",
+              "audio_file_url",
+              "stems_for_song",
+              "midi_url",
+              "project_state",
+              "fx_name"
+            ]
+          },
+          "required": { "type": "boolean" },
+          "status": {
+            "type": "string",
+            "enum": ["missing", "available", "unknown"]
+          },
+          "reason": { "type": "string" },
+          "proposed_resolution": {
+            "type": "object",
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "enum": ["ask_user", "call_tool", "use_default", "skip_feature"]
+              },
+              "tool_call": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "arguments": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "execution_policy": {
+      "type": "object",
+      "properties": {
+        "allow_auto_resolve": { "type": "boolean", "default": true },
+        "max_tool_calls": { "type": "integer", "minimum": 1, "maximum": 100, "default": 30 },
+        "on_missing_required": {
+          "type": "string",
+          "enum": ["block", "degrade"],
+          "default": "block"
+        }
+      }
+    }
+  }
+}

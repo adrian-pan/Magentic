@@ -1,0 +1,7 @@
+{
+  "name": "magentic",
+  "private": true,
+  "scripts": {
+    "benchmark": "cd backend && npm run benchmark"
+  }
+}

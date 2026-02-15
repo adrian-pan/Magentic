@@ -1,6 +1,6 @@
 """
 Magentic Bridge — Python/reapy bridge for direct REAPER control.
-Runs as a FastAPI server on port 5000.
+Runs on BRIDGE_PORT (default 5001). Backend uses BRIDGE_URL=http://localhost:5001.
 """
 
 import io

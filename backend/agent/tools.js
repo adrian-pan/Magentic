@@ -244,7 +244,7 @@ print(f"Removed FX ${fx_index} from track ${track_index}")
     `);
 }
 
-async function createFourOnTheFloorPattern({ file_url, track_name = 'Kick Pattern', num_bars = 4, position = 0 }) {
+async function addSamplerWithSample({ file_url, track_index = -1, track_name = 'Sampler' }) {
     const dlRes = await fetch(`${BRIDGE_URL}/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,50 +258,34 @@ async function createFourOnTheFloorPattern({ file_url, track_name = 'Kick Patter
         return { success: false, error: dl.error || 'Download failed' };
     }
 
+    const path = dl.path;
     const name = track_name;
-    const bars = Math.max(1, Math.min(32, parseInt(num_bars, 10) || 4));
-    const pos = parseFloat(position) || 0;
 
     return runCode(`
 import reapy
 RPR = reapy.reascript_api
-path = ${JSON.stringify(dl.path)}
+path = ${JSON.stringify(path)}
 track_name = ${JSON.stringify(name)}
-num_bars = ${bars}
-start_pos = ${pos}
 
-# Create new track at end
 n = RPR.CountTracks(0)
-RPR.InsertTrackAtIndex(n, True)
-track = RPR.GetTrack(0, n)
+idx = ${track_index} if ${track_index} >= 0 else n
+if idx >= n:
+    RPR.InsertTrackAtIndex(n, True)
+    idx = n
+track = RPR.GetTrack(0, idx)
 RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
 
-# Create source from file
-src = RPR.PCM_Source_CreateFromFile(path)
-if not src:
-    raise RuntimeError("Could not load audio file")
+# Add ReaSamplomatic5000 (RS5K) - plays samples triggered by MIDI
+fx_idx = int(RPR.TrackFX_AddByName(track, "ReaSamplOmatic5000", False, -1))
+if fx_idx < 0:
+    raise RuntimeError("ReaSamplOmatic5000 not found. It is built into REAPER.")
 
-lengthResult = RPR.GetMediaSourceLength(src, False)
-item_length = lengthResult[0] if isinstance(lengthResult, (list, tuple)) else lengthResult
-
-# 4-on-the-floor: beats 0,1,2,3 per bar
-beats = []
-for bar in range(num_bars):
-    for beat in range(4):
-        beats.append(bar * 4 + beat)
-
-# Place item at each beat
-for beat in beats:
-    t_sec = float(RPR.TimeMap2_QNToTime(0, start_pos + beat))
-    item = RPR.AddMediaItemToTrack(track)
-    RPR.SetMediaItemPosition(item, t_sec, False)
-    RPR.SetMediaItemLength(item, item_length, False)
-    take = RPR.AddTakeToMediaItem(item)
-    RPR.SetMediaItemTake_Source(take, src)
-    RPR.SetActiveTake(take)
-
-RPR.UpdateArrange()
-print(f"Created 4-on-the-floor pattern: {len(beats)} hits over {num_bars} bars on track '{track_name}'")
+# Load sample into RS5K via config parameter (FILE0 = first sample slot)
+ok = RPR.TrackFX_SetNamedConfigParm(track, fx_idx, "FILE0", path)
+if ok:
+    print(f"Added ReaSamplOmatic5000 with sample to track {idx} ({track_name}). MIDI notes will now trigger the sample.")
+else:
+    print(f"Added ReaSamplOmatic5000 to track {idx}. Sample load may need manual drag-drop. Path: {path}")
 `, 90000);
 }
 
@@ -542,7 +526,7 @@ const TOOL_DISPATCH = {
     toggle_fx: toggleFx,
     delete_midi_item: deleteMidiItem,
     remove_fx: removeFx,
-    create_four_on_the_floor_pattern: createFourOnTheFloorPattern,
+    add_sampler_with_sample: addSamplerWithSample,
     play,
     stop,
     set_cursor_position: setCursorPosition,
@@ -817,15 +801,14 @@ const TOOL_SCHEMAS = [
     {
         type: 'function',
         function: {
-            name: 'create_four_on_the_floor_pattern',
-            description: 'Create a new track with a 4-on-the-floor kick/sample pattern. Downloads the audio, creates a dedicated track, and places the sample on beats 0,1,2,3 of each bar. Use when user asks for "four on the floor" or "4-on-the-floor" kick pattern.',
+            name: 'add_sampler_with_sample',
+            description: 'Add ReaSamplOmatic5000 to a track and load a sample so MIDI notes trigger the sample. Use when you have MIDI items (clap, hihat, etc.) but no sound because the track has no instrument.',
             parameters: {
                 type: 'object',
                 properties: {
-                    file_url: { type: 'string', description: 'URL of the kick/sample audio file (from context files)' },
-                    track_name: { type: 'string', description: 'Name for the new track', default: 'Kick Pattern' },
-                    num_bars: { type: 'integer', description: 'Number of bars (1-32)', default: 4 },
-                    position: { type: 'number', description: 'Start position in beats', default: 0 },
+                    file_url: { type: 'string', description: 'URL of the sample to load (e.g. clap, hihat, snare)' },
+                    track_index: { type: 'integer', description: 'Track index (0-based). Use -1 to create a new track at the end.', default: -1 },
+                    track_name: { type: 'string', description: 'Name for the track', default: 'Sampler' },
                 },
                 required: ['file_url'],
             },
