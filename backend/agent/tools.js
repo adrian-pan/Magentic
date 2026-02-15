@@ -306,6 +306,50 @@ print(f"Created 4-on-the-floor pattern: {len(beats)} hits over {num_bars} bars o
 `, 90000);
 }
 
+// ---------------------------------------------------------------------------
+// Volume envelope tools (call dedicated bridge endpoint, not /execute)
+// ---------------------------------------------------------------------------
+
+async function createVolumeEnvelope({ track_index, points, curve = 'constant_db' }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+        const res = await fetch(`${BRIDGE_URL}/envelope/volume`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track_index, points, curve }),
+            signal: controller.signal,
+        });
+        return await res.json();
+    } catch (err) {
+        if (err.name === 'AbortError') return { success: false, error: 'Envelope creation timed out' };
+        if (err.cause?.code === 'ECONNREFUSED') return { success: false, error: `Cannot reach bridge at ${BRIDGE_URL}. Is it running?` };
+        return { success: false, error: err.message };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function removeVolumeEnvelope({ track_index }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+        const res = await fetch(`${BRIDGE_URL}/envelope/volume/remove`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track_index }),
+            signal: controller.signal,
+        });
+        return await res.json();
+    } catch (err) {
+        if (err.name === 'AbortError') return { success: false, error: 'Envelope removal timed out' };
+        if (err.cause?.code === 'ECONNREFUSED') return { success: false, error: `Cannot reach bridge at ${BRIDGE_URL}. Is it running?` };
+        return { success: false, error: err.message };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 async function play() {
     return runCode(`
 import reapy
@@ -557,6 +601,8 @@ const TOOL_DISPATCH = {
     delete_midi_item: deleteMidiItem,
     remove_fx: removeFx,
     create_four_on_the_floor_pattern: createFourOnTheFloorPattern,
+    create_volume_envelope: createVolumeEnvelope,
+    remove_volume_envelope: removeVolumeEnvelope,
     play,
     stop,
     set_cursor_position: setCursorPosition,
@@ -840,6 +886,53 @@ const TOOL_SCHEMAS = [
                     fx_index: { type: 'integer', description: 'FX index on the track (0-based)' },
                 },
                 required: ['track_index', 'fx_index'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'create_volume_envelope',
+            description: 'Create or update volume automation (envelope) on a track. Adds visible automation points that control volume over time. Use for fades, swells, ducking, etc. Values: 1.0 = 0 dB (unity), 0.0 = silence. IMPORTANT: Always use curve="constant_db" for fade-ins/fade-outs — this creates a perceptually smooth, even fade. Only use curve="linear" for special effects where you want an abrupt perceived drop.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer', description: 'Track index (0-based)' },
+                    points: {
+                        type: 'array',
+                        description: 'Automation points. Each point has time (seconds), value (0.0-1.0 linear gain), and optional shape (default 0=linear).',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                time: { type: 'number', description: 'Position in seconds (absolute project time)' },
+                                value: { type: 'number', description: 'Volume level: 1.0 = 0 dB, 0.5 ≈ -6 dB, 0.0 = silence' },
+                                shape: { type: 'integer', description: 'Envelope shape (0=linear, 1=square, 2=slow, 3=fast start, 4=fast end, 5=bezier)', default: 0 },
+                            },
+                            required: ['time', 'value'],
+                        },
+                    },
+                    curve: {
+                        type: 'string',
+                        enum: ['linear', 'constant_db'],
+                        description: 'Interpolation curve. "constant_db" = perceptually even fade (sounds smooth — USE THIS for fade-ins/outs). "linear" = straight line in gain (sounds like an abrupt drop).',
+                        default: 'constant_db',
+                    },
+                },
+                required: ['track_index', 'points'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'remove_volume_envelope',
+            description: 'Remove volume automation (envelope) from a track entirely — clears all points and hides the envelope lane.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer', description: 'Track index (0-based)' },
+                },
+                required: ['track_index'],
             },
         },
     },

@@ -298,6 +298,35 @@ harmony_take.sort_events()
 print(f"Done! Modified {track.name}")
 \`\`\`
 
+### Volume Automation (Envelopes) — TOOL ONLY, NO CODE
+**CRITICAL: \`create_volume_envelope\` is a TOOL (like \`add_fx\` or \`remove_fx\`). It is NOT a Python function or method. Do NOT call it in a \`\`\`python:execute\`\`\` block. Call it as a tool (function calling).**
+
+Do NOT write code like \`project.create_volume_envelope(...)\` — that does not exist. Instead, call the \`create_volume_envelope\` tool directly via function calling, just like you would call \`add_fx\` or \`create_track\`.
+
+**How to use:**
+1. From the project state, find the track by name and get its **track index** (0-based).
+2. If you need the fade to span the item/track length, read it from the project state snapshot. Each track has an \`items\` array with \`position\` (seconds) and \`length\` (seconds) for each item. The fade end time is \`position + length\`.
+3. Call the \`create_volume_envelope\` tool with these arguments:
+   - \`track_index\`: integer, 0-based track index
+   - \`points\`: array of objects, each with \`time\` (seconds), \`value\` (0.0–1.0), optional \`shape\` (0=linear)
+   - \`curve\`: **Always use \`"constant_db"\`** for fade-ins/fade-outs (default). This creates a perceptually smooth, even fade. Only use \`"linear"\` if the user specifically wants an abrupt, front-loaded volume drop.
+   - **Value scale:** 1.0 = 0 dB (full volume), 0.5 ≈ −6 dB, 0.1 ≈ −20 dB, 0.0 = silence.
+   - **Relative fades:** If the user says "fade from 100% to 10%", use values 1.0 → 0.1.
+   - **Why constant_db matters:** Human hearing is logarithmic. A straight-line fade in gain (1.0→0.0) sounds like the volume drops to near-silence almost instantly. \`constant_db\` automatically generates ~20 intermediate points along a logarithmic curve so the fade sounds even and gradual.
+
+**Example — fade out over track length:** Call tool \`create_volume_envelope\` with arguments:
+\`\`\`json
+{ "track_index": 2, "points": [{"time": 0, "value": 1.0}, {"time": 24, "value": 0.0}], "curve": "constant_db" }
+\`\`\`
+
+**Example — volume swell:** Call tool \`create_volume_envelope\` with arguments:
+\`\`\`json
+{ "track_index": 0, "points": [{"time": 0, "value": 0.1}, {"time": 8, "value": 1.0}, {"time": 16, "value": 0.1}], "curve": "constant_db" }
+\`\`\`
+
+### Removing Automation — TOOL ONLY, NO CODE
+**Call the \`remove_volume_envelope\` tool (not Python code).** Arguments: \`{ "track_index": <index> }\`. This removes all points AND hides the envelope lane.
+
 ## Context Files & ML Tools
 
 When the user has imported files (in "Currently Loaded Context Files"), each has **name**, **type**, and **url**. Use the **url** with these tools:
