@@ -85,7 +85,11 @@ function Platform() {
                     </div>
                     <div className="project-info-item">
                       <span className="project-info-label">DURATION</span>
-                      <span className="project-info-value">{Math.floor(projectState.project.length / 60)}:{String(Math.floor(projectState.project.length % 60)).padStart(2, '0')}</span>
+                      <span className="project-info-value">
+                        {projectState.project.length != null
+                          ? `${Math.floor(projectState.project.length / 60)}:${String(Math.floor(projectState.project.length % 60)).padStart(2, '0')}`
+                          : '0:00'}
+                      </span>
                     </div>
                   </div>
                   {projectState.tracks && projectState.tracks.length > 0 && (

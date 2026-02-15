@@ -148,7 +148,7 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
                         <div className="empty-state-icon">!</div>
                         <div className="empty-state-text">
                             NO_DATA_LOADED<br />
-                            IMPORT_SCRIPTS_OR_NOTES
+                            IMPORT_AUDIO_PLUGINS_OR_INSTRUMENTS
                         </div>
                     </div>
                 )}
