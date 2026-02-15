@@ -244,16 +244,61 @@ print(f"Added {len(notes)} notes to track ${track_index} item ${item_index}")
 }
 
 async function addFx({ track_index, fx_name }) {
-    return runCode(`
+    const name = (fx_name ?? '').toString().trim();
+    if (!name) return { success: false, error: 'fx_name is required' };
+
+    // Heuristic aliases/fallbacks for common user phrases and naming mismatches.
+    const lower = name.toLowerCase();
+    const candidates = [name];
+    if (!lower.startsWith('vst3:')) candidates.push(`VST3: ${name}`);
+
+    const mentionsAutoTune = /auto[-\s]?tune/.test(lower);
+    if ((lower.includes('antares') && mentionsAutoTune)
+        || lower === 'auto-tune'
+        || lower === 'autotune') {
+        candidates.push('Auto-Tune Artist (Antares)');
+        candidates.push('VST3: Auto-Tune Artist (Antares)');
+    }
+
+    // De-dup while preserving order
+    const uniqueCandidates = [...new Set(candidates)];
+
+    const res = await runCode(`
 import reapy
 RPR = reapy.reascript_api
 track = RPR.GetTrack(0, int(${track_index}))
-fx_index = int(RPR.TrackFX_AddByName(track, ${JSON.stringify(fx_name)}, False, -1))
-if fx_index < 0:
-    print(f"ERROR: Plugin '${fx_name}' not found in REAPER. Check the exact name in the FX browser.")
+candidates = ${JSON.stringify(uniqueCandidates)}
+found_index = -1
+found_name = None
+for nm in candidates:
+    fx_index = int(RPR.TrackFX_AddByName(track, nm, False, -1))
+    if fx_index >= 0:
+        found_index = fx_index
+        found_name = nm
+        break
+
+if found_index >= 0:
+    print(f"ADD_FX_OK|{found_index}|{found_name}")
 else:
-    print(f"Added FX '${fx_name}' to track ${track_index} at FX index {fx_index}")
+    print("ADD_FX_ERR|NO_MATCH")
     `, 90000);
+
+    if (!res?.success) return { success: false, error: res?.error || 'add_fx bridge execution failed' };
+    const out = _extractStdout(res).trim();
+    const ok = /ADD_FX_OK\|(\d+)\|(.+)/.exec(out);
+    if (ok) {
+        return {
+            success: true,
+            output: `Added FX '${ok[2]}' to track ${track_index} at FX index ${ok[1]}`,
+            fx_index: Number.parseInt(ok[1], 10),
+            resolved_name: ok[2],
+        };
+    }
+
+    return {
+        success: false,
+        error: `Plugin '${name}' not found in REAPER. Try exact FX browser name (e.g. 'VST3: Auto-Tune Artist (Antares)').`,
+    };
 }
 
 async function setFxParam({ track_index, fx_index, param_name, value }) {
