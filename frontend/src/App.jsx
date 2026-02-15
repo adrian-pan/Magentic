@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import ChatPanel from './components/ChatPanel';
 import ImportPanel from './components/ImportPanel';
 import Logo from './components/Logo';
+import WelcomePage from './components/WelcomePage';
 
 const API_URL = 'http://localhost:3001';
 
-export default function App() {
+function Platform() {
   const [files, setFiles] = useState([]);
   const [contextFiles, setContextFiles] = useState([]);
   const [projectState, setProjectState] = useState(null);
@@ -46,7 +48,7 @@ export default function App() {
           <span className="app-logo-text">MAGENTIC</span>
         </div>
         <div className="app-status">
-          <span className="status-text">[SYSTEM: ONLINE]</span>
+          <span className="status-text">[AGENT: ONLINE]</span>
         </div>
       </header>
 
@@ -135,5 +137,14 @@ export default function App() {
         />
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<WelcomePage />} />
+      <Route path="/app" element={<Platform />} />
+    </Routes>
   );
 }

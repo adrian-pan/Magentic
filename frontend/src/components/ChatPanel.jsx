@@ -203,8 +203,8 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                             color: '#00ff9d',
                             border: '1px solid #333',
                             borderRadius: '4px',
-                            padding: '4px 8px',
-                            fontSize: '0.8rem',
+                            padding: '4px 6px',
+                            fontSize: '13px',
                             fontFamily: 'monospace',
                             outline: 'none',
                             cursor: 'pointer'
@@ -216,7 +216,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     {reaperStatus && (
                         <div className={`reaper-status ${reaperStatus.reaper_connected ? 'connected' : 'disconnected'}`}>
                             {reaperStatus.reaper_connected
-                                ? `[LINK: ACTIVE] v${reaperStatus.reaper_version}`
+                                ? `[LINK: ACTIVE] REAPER v${reaperStatus.reaper_version}`
                                 : '[LINK: OFFLINE]'}
                         </div>
                     )}
