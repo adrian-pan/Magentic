@@ -9,9 +9,56 @@ const { evaluateNeeds } = require('./evaluateNeeds');
 const { normalizeProjectState } = require('./normalizeProjectState');
 const { TOOL_DISPATCH } = require('../agent/tools');
 
+const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:5001';
+
 const MAX_REPAIR_ROUNDS = 3;
 const MAX_AUTO_RESOLVE = 2;
 const JSON_PARSE_RETRY = 1;
+
+/**
+ * Fetch installed VST/AU instruments from REAPER via bridge.
+ * Returns array of instrument name strings (e.g. "Serum 2 (Xfer Records)").
+ */
+let _cachedInstruments = null;
+let _instrumentsCacheTime = 0;
+const INSTRUMENTS_CACHE_TTL = 60_000; // 1 minute
+
+async function getInstalledInstruments() {
+    const now = Date.now();
+    if (_cachedInstruments && now - _instrumentsCacheTime < INSTRUMENTS_CACHE_TTL) {
+        return _cachedInstruments;
+    }
+    try {
+        const res = await fetch(`${BRIDGE_URL}/analyze/instruments`);
+        if (!res.ok) return _cachedInstruments || [];
+        const data = await res.json();
+        if (data.success && Array.isArray(data.instruments)) {
+            _cachedInstruments = data.instruments.map((i) => i.name).filter(Boolean);
+            _instrumentsCacheTime = now;
+            return _cachedInstruments;
+        }
+    } catch {
+        // Bridge unreachable — use cache or empty
+    }
+    return _cachedInstruments || [];
+}
+
+function buildContextRequestQuestions(userText = '') {
+    const text = String(userText || '').toLowerCase();
+    const questions = [
+        'What style/genre and target energy are you going for?',
+        'What tempo/key/bar length should I use?',
+        'If editing existing parts, which track(s) should I change?',
+    ];
+
+    if (/stems?/.test(text)) {
+        questions.unshift('Which song name should I use to fetch stems?');
+    }
+    if (/transcribe|midi/.test(text)) {
+        questions.unshift('Can you share the audio file URL (or upload) to transcribe?');
+    }
+    return questions.slice(0, 3);
+}
 
 /**
  * Run auto-resolve tool calls and merge results into assets/context.
@@ -97,20 +144,24 @@ async function planWithRepair(opts) {
                 repairRound--;
                 continue;
             }
+            console.warn('[planWithRepair] Planner call failed:', err.message);
             return {
                 plan: null,
                 blocked: true,
                 missing: [],
-                suggestedQuestions: [`Planner error: ${err.message}`],
+                suggestedQuestions: buildContextRequestQuestions(userText),
             };
         }
 
+        // Merge FX already on tracks + installed instruments from REAPER plugin DB
+        const trackFx = (context?.tracks || []).flatMap((t) =>
+            (t.fx || [])
+                .map((f) => (typeof f === 'string' ? f : f?.name))
+                .filter(Boolean)
+        );
+        const installedInstruments = await getInstalledInstruments();
         const capabilities = {
-            known_fx: (context?.tracks || []).flatMap((t) =>
-                (t.fx || [])
-                    .map((f) => (typeof f === 'string' ? f : f?.name))
-                    .filter(Boolean)
-            ),
+            known_fx: [...new Set([...trackFx, ...installedInstruments])],
         };
         validation = validatePlan(plan, { userText, assets, capabilities });
         lastErrors = validation.errors || [];
@@ -123,11 +174,14 @@ async function planWithRepair(opts) {
     }
 
     if (!plan || !validation.ok) {
+        if (lastErrors.length) {
+            console.warn('[planWithRepair] Plan validation failed:', lastErrors.slice(0, 3).join(' | '));
+        }
         return {
             plan: null,
             blocked: true,
             missing: [],
-            suggestedQuestions: lastErrors.length ? lastErrors : ['Plan validation failed.'],
+            suggestedQuestions: buildContextRequestQuestions(userText),
         };
     }
 

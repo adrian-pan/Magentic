@@ -5,12 +5,15 @@
 
 const OpenAI = require('openai');
 
-const PLANNER_PROVIDER = process.env.PLANNER_PROVIDER || 'openai';
-const PLANNER_RUNPOD_ENDPOINT_ID = process.env.PLANNER_RUNPOD_ENDPOINT_ID;
-const PLANNER_RUNPOD_API_KEY = process.env.PLANNER_RUNPOD_API_KEY || process.env.RUNPOD_API_KEY;
-const PLANNER_BASE_URL = process.env.PLANNER_BASE_URL;
-const PLANNER_FLASH_URL = process.env.PLANNER_FLASH_URL || 'http://localhost:8888';
-const PLANNER_MODAL_URL = process.env.PLANNER_MODAL_URL;
+// Prefer REASONING_* names; keep PLANNER_* for backward compatibility.
+const REASONING_PROVIDER = process.env.REASONING_PROVIDER || process.env.PLANNER_PROVIDER || 'openai';
+const REASONING_RUNPOD_ENDPOINT_ID =
+  process.env.REASONING_RUNPOD_ENDPOINT_ID || process.env.PLANNER_RUNPOD_ENDPOINT_ID;
+const REASONING_RUNPOD_API_KEY =
+  process.env.REASONING_RUNPOD_API_KEY || process.env.PLANNER_RUNPOD_API_KEY || process.env.RUNPOD_API_KEY;
+const REASONING_BASE_URL = process.env.REASONING_BASE_URL || process.env.PLANNER_BASE_URL;
+const REASONING_FLASH_URL = process.env.REASONING_FLASH_URL || process.env.PLANNER_FLASH_URL || 'http://localhost:8888';
+const REASONING_MODAL_URL = process.env.REASONING_MODAL_URL || process.env.PLANNER_MODAL_URL;
 
 const PLANNER_SYSTEM = `You are a music production planner. Output ONLY valid JSON matching the MusicPlan schema. No markdown, no prose.
 
@@ -127,7 +130,7 @@ function normalizePlanShape(plan) {
         ? need.proposed_resolution.tool_call.arguments
         : {};
     const songName = need.proposed_resolution.tool_call.arguments.song_name;
-    if (typeof songName === 'string' && /^(undefined|null|n\/a|na|\s*)$/i.test(songName.trim())) {
+    if (typeof songName === 'string' && /^(undefined|null|n\/a|na|\.{1,3}|<.*>|\?\??||\s*)$/i.test(songName.trim())) {
       delete need.proposed_resolution.tool_call.arguments.song_name;
     }
   }
@@ -198,11 +201,13 @@ function extractRunpodContent(output) {
 }
 
 async function runPodPlan(systemPrompt, userMsg) {
-  const apiKey = PLANNER_RUNPOD_API_KEY || process.env.RUNPOD_API_KEY;
-  if (!apiKey) throw new Error('PLANNER_RUNPOD_API_KEY or RUNPOD_API_KEY required for runpod_vllm');
-  if (!PLANNER_RUNPOD_ENDPOINT_ID && !PLANNER_BASE_URL) throw new Error('PLANNER_RUNPOD_ENDPOINT_ID required for runpod_vllm');
+  const apiKey = REASONING_RUNPOD_API_KEY || process.env.RUNPOD_API_KEY;
+  if (!apiKey) throw new Error('REASONING_RUNPOD_API_KEY (or legacy PLANNER_RUNPOD_API_KEY) required for runpod_vllm');
+  if (!REASONING_RUNPOD_ENDPOINT_ID && !REASONING_BASE_URL) {
+    throw new Error('REASONING_RUNPOD_ENDPOINT_ID (or legacy PLANNER_RUNPOD_ENDPOINT_ID) required for runpod_vllm');
+  }
 
-  const baseUrl = PLANNER_BASE_URL || `https://api.runpod.ai/v2/${PLANNER_RUNPOD_ENDPOINT_ID}`;
+  const baseUrl = REASONING_BASE_URL || `https://api.runpod.ai/v2/${REASONING_RUNPOD_ENDPOINT_ID}`;
   const submitUrl = `${baseUrl.replace(/\/$/, '')}/run`;
   const headers = {
     'Content-Type': 'application/json',
@@ -246,7 +251,7 @@ async function runPodPlan(systemPrompt, userMsg) {
 async function openaiPlan(userMsg) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await openai.chat.completions.create({
-    model: process.env.PLANNER_MODEL || 'gpt-4o-mini',
+    model: process.env.REASONING_MODEL || process.env.PLANNER_MODEL || 'gpt-4o-mini',
     messages: [
       { role: 'system', content: PLANNER_SYSTEM },
       { role: 'user', content: userMsg },
@@ -258,7 +263,7 @@ async function openaiPlan(userMsg) {
 }
 
 async function flashPlan(systemPrompt, userMsg) {
-  const url = `${PLANNER_FLASH_URL.replace(/\/$/, '')}/planner/generate`;
+  const url = `${REASONING_FLASH_URL.replace(/\/$/, '')}/planner/generate`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -270,8 +275,8 @@ async function flashPlan(systemPrompt, userMsg) {
 }
 
 async function modalPlan(systemPrompt, userMsg) {
-  if (!PLANNER_MODAL_URL) throw new Error('PLANNER_MODAL_URL is required for PLANNER_PROVIDER=modal');
-  const url = `${PLANNER_MODAL_URL.replace(/\/$/, '')}/generate`;
+  if (!REASONING_MODAL_URL) throw new Error('REASONING_MODAL_URL (or legacy PLANNER_MODAL_URL) is required for REASONING_PROVIDER=modal');
+  const url = `${REASONING_MODAL_URL.replace(/\/$/, '')}/generate`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -297,29 +302,29 @@ async function planMusic(opts) {
     userMsg += `\n\nPrevious plan had errors. Fix and output valid JSON only:\nErrors: ${(validatorErrors || []).join('; ')}\nWarnings: ${(validatorWarnings || []).join('; ')}`;
   }
 
-  if (PLANNER_PROVIDER === 'flash') return flashPlan(PLANNER_SYSTEM, userMsg);
-  if (PLANNER_PROVIDER === 'modal') return modalPlan(PLANNER_SYSTEM, userMsg);
-  if (PLANNER_PROVIDER === 'runpod_vllm') return runPodPlan(PLANNER_SYSTEM, userMsg);
+  if (REASONING_PROVIDER === 'flash') return flashPlan(PLANNER_SYSTEM, userMsg);
+  if (REASONING_PROVIDER === 'modal') return modalPlan(PLANNER_SYSTEM, userMsg);
+  if (REASONING_PROVIDER === 'runpod_vllm') return runPodPlan(PLANNER_SYSTEM, userMsg);
   return openaiPlan(userMsg);
 }
 
 async function checkPlannerHealth() {
-  const provider = process.env.PLANNER_PROVIDER || 'openai';
+  const provider = process.env.REASONING_PROVIDER || process.env.PLANNER_PROVIDER || 'openai';
   if (provider === 'openai') {
     return { ok: !!(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('sk-your')), provider: 'openai' };
   }
   if (provider === 'flash') {
     try {
-      const res = await fetch(`${PLANNER_FLASH_URL.replace(/\/$/, '')}/health`);
+      const res = await fetch(`${REASONING_FLASH_URL.replace(/\/$/, '')}/health`);
       return res.ok ? { ok: true, provider: 'flash' } : { ok: false, provider: 'flash', error: `HTTP ${res.status}` };
     } catch (e) {
       return { ok: false, provider: 'flash', error: e.message || 'unreachable' };
     }
   }
   if (provider === 'modal') {
-    if (!PLANNER_MODAL_URL) return { ok: false, provider: 'modal', error: 'PLANNER_MODAL_URL is missing' };
+    if (!REASONING_MODAL_URL) return { ok: false, provider: 'modal', error: 'REASONING_MODAL_URL (or PLANNER_MODAL_URL) is missing' };
     try {
-      const res = await fetch(`${PLANNER_MODAL_URL.replace(/\/$/, '')}/health`);
+      const res = await fetch(`${REASONING_MODAL_URL.replace(/\/$/, '')}/health`);
       return res.ok ? { ok: true, provider: 'modal' } : { ok: false, provider: 'modal', error: `HTTP ${res.status}` };
     } catch (e) {
       return { ok: false, provider: 'modal', error: e.message || 'unreachable' };
@@ -327,8 +332,8 @@ async function checkPlannerHealth() {
   }
   if (provider === 'runpod_vllm') {
     try {
-      const healthUrl = `${(PLANNER_BASE_URL || `https://api.runpod.ai/v2/${PLANNER_RUNPOD_ENDPOINT_ID}`).replace(/\/$/, '')}/health`;
-      const res = await fetch(healthUrl, { headers: { Authorization: `Bearer ${PLANNER_RUNPOD_API_KEY || process.env.RUNPOD_API_KEY}` } });
+      const healthUrl = `${(REASONING_BASE_URL || `https://api.runpod.ai/v2/${REASONING_RUNPOD_ENDPOINT_ID}`).replace(/\/$/, '')}/health`;
+      const res = await fetch(healthUrl, { headers: { Authorization: `Bearer ${REASONING_RUNPOD_API_KEY || process.env.RUNPOD_API_KEY}` } });
       if (!res.ok) return { ok: false, provider: 'runpod_vllm', error: `HTTP ${res.status}` };
       const data = await res.json();
       if (data.error) return { ok: false, provider: 'runpod_vllm', error: data.error };

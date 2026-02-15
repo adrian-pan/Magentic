@@ -62,14 +62,14 @@ app.listen(PORT, async () => {
 
     try {
         const { checkPlannerHealth } = require('./musicPlan/plannerClient');
-        const plannerHealth = await checkPlannerHealth();
-        if (plannerHealth.ok) {
-            console.log(`   ✓ Planner (${plannerHealth.provider}) — ready`);
+        const reasoningHealth = await checkPlannerHealth();
+        if (reasoningHealth.ok) {
+            console.log(`   ✓ Reasoning provider (${reasoningHealth.provider}) — ready`);
         } else {
-            console.log(`   ⚠ Planner (${plannerHealth.provider}) — ${plannerHealth.error || 'unreachable'}`);
+            console.log(`   ⚠ Reasoning provider (${reasoningHealth.provider}) — ${reasoningHealth.error || 'unreachable'}`);
         }
     } catch (e) {
-        console.log(`   ⚠ Planner health check failed: ${e.message}`);
+        console.log(`   ⚠ Reasoning provider health check failed: ${e.message}`);
     }
     console.log('');
 });

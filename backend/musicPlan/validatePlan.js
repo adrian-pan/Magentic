@@ -189,9 +189,11 @@ function validateAudioNeeds(plan, opts = {}) {
 function validateTensionRelease(plan, opts = {}) {
     const errors = [];
     const userText = (opts.userText || '').toLowerCase();
-    const intent = (plan.meta?.intent || '').toLowerCase();
-    const hasIntent = /tension|build|release|resolve|first.*bar|last.*bar/.test(userText) || /tension|release/.test(intent);
-    if (!hasIntent) return { ok: true, errors: [], warnings: [] };
+    // Only fire when user explicitly asks for tension/release structure — not on
+    // generic "build a beat" or "add hihats" prompts.
+    const hasTensionIntent =
+        /tension.*release|build.*tension|resolve.*chord|first.*bars?.*build.*last|last.*bars?.*resolve/.test(userText);
+    if (!hasTensionIntent) return { ok: true, errors: [], warnings: [] };
 
     const key = (plan.transport?.key || '').toLowerCase();
     const isAMinor = /a\s*minor|aminor|a minor/.test(key);
@@ -271,8 +273,8 @@ function validateStemsSongNameGuess(plan) {
         if (strategy !== 'ask_user') continue;
 
         const s = song.trim();
-        // Allow placeholders only; block concrete guessed names.
-        const placeholder = /^(unknown|ask_user|user_input|please_provide_song_name|song_name)$/i.test(s);
+        // Allow placeholders, ellipsis, and empty-ish values; block concrete guessed names.
+        const placeholder = /^(unknown|ask_user|user_input|please_provide_song_name|song_name|\.{1,3}|<.*>|\?\??\??|)$/i.test(s) || s.length <= 3;
         if (!placeholder) {
             errors.push(`RANDOM_SONG_NAME_GUESS: needs "${need.id || need.type}" guessed song_name="${s}". Ask user instead.`);
         }
