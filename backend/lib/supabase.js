@@ -55,6 +55,29 @@ function getPublicUrl(path) {
     return data.publicUrl;
 }
 
+/** Recursively list files in bucket, optionally filter by name (substring match). */
+async function listBucketFiles(prefix = '', nameContains = null) {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Supabase not configured.');
+    const results = [];
+    async function listDir(path) {
+        const { data, error } = await sb.storage.from(BUCKET).list(path, { limit: 1000 });
+        if (error) throw error;
+        for (const item of data || []) {
+            const fullPath = path ? `${path}/${item.name}` : item.name;
+            if (item.id === null) {
+                await listDir(fullPath);
+            } else {
+                if (!nameContains || item.name.toLowerCase().includes(nameContains.toLowerCase())) {
+                    results.push({ path: fullPath, name: item.name });
+                }
+            }
+        }
+    }
+    await listDir(prefix);
+    return results;
+}
+
 module.exports = {
     getSupabase,
     BUCKET,
@@ -62,4 +85,5 @@ module.exports = {
     downloadFromBucket,
     deleteFromBucket,
     getPublicUrl,
+    listBucketFiles,
 };

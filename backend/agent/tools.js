@@ -159,6 +159,86 @@ else:
     `, 90000);
 }
 
+async function insertMediaToTrack({ file_url, track_index = -1, track_name = 'Audio', position = 0 }) {
+    const dlRes = await fetch(`${BRIDGE_URL}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: file_url,
+            filename: file_url.split('/').pop().split('?')[0],
+        }),
+    });
+    const dl = await dlRes.json();
+    if (!dl.success || !dl.path) {
+        return { success: false, error: dl.error || 'Download failed' };
+    }
+
+    const trackIdx = track_index;
+    const name = track_name;
+    const pos = position;
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+path = ${JSON.stringify(dl.path)}
+track_name = ${JSON.stringify(name)}
+pos = ${pos}
+
+n = RPR.CountTracks(0)
+idx = ${trackIdx} if ${trackIdx} >= 0 else n
+if idx >= n:
+    RPR.InsertTrackAtIndex(n, True)
+    idx = n
+track = RPR.GetTrack(0, idx)
+RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
+
+for i in range(RPR.CountTracks(0)):
+    RPR.SetTrackSelected(RPR.GetTrack(0, i), False)
+RPR.SetTrackSelected(track, True)
+RPR.SetEditCurPos(pos, True, False)
+RPR.InsertMedia(path, 0)
+print("Inserted audio as media item on track", idx, "(" + track_name + ") at", pos, "s")
+`, 90000);
+}
+
+async function addSampleToTrack({ file_url, track_index = -1, track_name = 'Sample' }) {
+    const dlRes = await fetch(`${BRIDGE_URL}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: file_url,
+            filename: file_url.split('/').pop().split('?')[0],
+        }),
+    });
+    const dl = await dlRes.json();
+    if (!dl.success || !dl.path) {
+        return { success: false, error: dl.error || 'Download failed' };
+    }
+
+    const trackIdx = track_index;
+    const name = track_name;
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+path = ${JSON.stringify(dl.path)}
+track_name = ${JSON.stringify(name)}
+
+n = RPR.CountTracks(0)
+idx = ${trackIdx} if ${trackIdx} >= 0 else n
+if idx >= n:
+    RPR.InsertTrackAtIndex(n, True)
+    idx = n
+track = RPR.GetTrack(0, idx)
+RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
+
+fx_idx = RPR.TrackFX_AddByName(track, "ReaSamplomatic5000", False, -1)
+if fx_idx < 0:
+    print("ERROR: ReaSamplomatic5000 not found")
+else:
+    RPR.TrackFX_SetNamedConfigParm(track, fx_idx, "FILE0", path)
+    print("Added ReaSamplomatic5000 with sample to track", idx, "(" + track_name + ")")
+`, 90000);
+}
+
 async function setFxParam({ track_index, fx_index, param_name, value }) {
     return runCode(`
 import reapy
@@ -257,6 +337,8 @@ const TOOL_DISPATCH = {
     create_midi_item: createMidiItem,
     add_midi_notes: addMidiNotes,
     add_fx: addFx,
+    add_sample_to_track: addSampleToTrack,
+    insert_media_to_track: insertMediaToTrack,
     set_fx_param: setFxParam,
     list_fx_params: listFxParams,
     load_fx_preset: loadFxPreset,
@@ -427,6 +509,39 @@ const TOOL_SCHEMAS = [
                     fx_name: { type: 'string', description: 'Plugin name as it appears in REAPER FX browser' },
                 },
                 required: ['track_index', 'fx_name'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'add_sample_to_track',
+            description: 'Add an imported audio file as a one-shot sample in ReaSamplomatic5000 on a track. Use when the user wants to add "the imported sound" as an instrument/sampler. Requires file_url from context files.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
+                    track_index: { type: 'integer', description: 'Track index (0-based). -1 = append new track', default: -1 },
+                    track_name: { type: 'string', description: 'Name for the track if creating new', default: 'Sample' },
+                },
+                required: ['file_url'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'insert_media_to_track',
+            description: 'Insert an imported audio file as a media item on the timeline (visible waveform block). Use when the user wants the audio "on the grid" or "in the pattern" as a visible clip they can move, trim, edit. Requires file_url from context files.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
+                    track_index: { type: 'integer', description: 'Track index (0-based). -1 = append new track', default: -1 },
+                    track_name: { type: 'string', description: 'Name for the track if creating new', default: 'Audio' },
+                    position: { type: 'number', description: 'Start position in seconds on timeline', default: 0 },
+                },
+                required: ['file_url'],
             },
         },
     },

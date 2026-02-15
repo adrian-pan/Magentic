@@ -8,10 +8,15 @@ import os
 import sys
 import json
 import traceback
+import ssl
+import tempfile
+import urllib.request
 from contextlib import redirect_stdout, redirect_stderr
 
 import reapy
 import threading
+
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,6 +37,11 @@ app.add_middleware(
 
 class ExecuteRequest(BaseModel):
     code: str
+
+
+class DownloadRequest(BaseModel):
+    url: str
+    filename: Optional[str] = None
 
 
 class ExecuteResponse(BaseModel):
@@ -220,6 +230,35 @@ def analyze_instruments():
     return {"success": True, "instruments": insts}
 
 
+@app.post("/download")
+def download_file(request: DownloadRequest):
+    """Download a file from URL to a temp path REAPER can access. Returns local path."""
+    try:
+        filename = request.filename or "sample"
+        if "." not in filename and request.url:
+            base = request.url.split("?")[0]
+            ext = base.split(".")[-1]
+            if len(ext) <= 4 and ext.isalnum():
+                filename = f"{filename}.{ext}"
+        suffix = os.path.splitext(filename)[1] or ".mp3"
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        # macOS Python often lacks system certs; use certifi if available
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(request.url, context=ssl_ctx) as resp:
+            with open(path, "wb") as f:
+                f.write(resp.read())
+        return {"success": True, "path": path}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.get("/")
 def root():
     return {
@@ -228,7 +267,7 @@ def root():
         "endpoints": {
             "GET /status": "Check REAPER connection",
             "POST /execute": "Execute reapy code in REAPER",
-            "POST /execute": "Execute reapy code in REAPER",
+            "POST /download": "Download URL to temp path for REAPER",
             "GET /analyze": "Analyze current REAPER project state",
             "GET /analyze/instruments": "List installed VST/AU instruments",
         },
@@ -241,6 +280,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("BRIDGE_PORT", 5001))
     print(f"\n🧲 Magentic Bridge starting on http://localhost:{port}")
     print("   POST /execute  — Run reapy code in REAPER")
+    print("   POST /download — Download URL to temp path for REAPER")
     print("   GET  /analyze  — Read full REAPER project state")
     print("   GET  /analyze/instruments — List installed instruments")
     print("   GET  /status   — Check REAPER connection\n")
