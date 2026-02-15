@@ -39,6 +39,7 @@ app.listen(PORT, () => {
     console.log(`   POST /api/execute        — Execute code in REAPER`);
     console.log(`   GET  /api/reaper/status  — REAPER connection status`);
     console.log(`   GET  /api/reaper/analyze — Analyze REAPER project`);
+    console.log(`   GET  /api/reaper/analyze/instruments — List installed instruments`);
     console.log(`   GET  /api/health         — Health check\n`);
 
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith('sk-your')) {

@@ -107,6 +107,81 @@ item.length                        # Get/set length in seconds
 item.is_muted                      # Get/set mute
 take = item.active_take            # Get active take
 take.name                          # Take name
+take.is_midi                       # Check if take contains MIDI data
+\`\`\`
+
+### MIDI on Take
+\`\`\`python
+# Reading MIDI notes (NOT .midi_notes — use .notes)
+notes = take.notes                 # NoteList of all MIDI notes (time-sorted)
+take.n_notes                       # Number of notes
+
+# Each Note has these READ-ONLY properties:
+note = take.notes[0]
+note.pitch                         # MIDI pitch 0-127 (C4=60)
+note.start                         # Start time in seconds
+note.end                           # End time in seconds
+note.velocity                      # Velocity 0-127
+note.channel                       # MIDI channel 0-15
+note.infos                         # Dict with all properties at once (most efficient)
+
+# Adding notes — IMPORTANT: start and end come BEFORE pitch
+take.add_note(
+    start=0.0,                     # Start time (unit depends on 'unit' param)
+    end=1.0,                       # End time (unit depends on 'unit' param)
+    pitch=60,                      # MIDI pitch 0-127
+    velocity=100,                  # Velocity 0-127 (default=100)
+    channel=0,                     # MIDI channel 0-15 (default=0)
+    selected=False,                # Select the note (default=False)
+    muted=False,                   # Mute the note (default=False)
+    unit='seconds',                # 'seconds', 'beats', or 'ppq' (default='seconds')
+    sort=True                      # Sort after insert (default=True, set False for batch)
+)
+
+# Batch insert: set sort=False, then call sort_events() at the end
+for n in notes_to_add:
+    take.add_note(start=n['start'], end=n['end'], pitch=n['pitch'],
+                  velocity=n.get('velocity', 100), unit='beats', sort=False)
+take.sort_events()                 # Sort once after all inserts
+
+# Creating a new empty MIDI item on a track
+new_item = track.add_midi_item(start=0, end=4, quantize=False)
+# quantize=True means start/end are in beats; False means seconds
+\`\`\`
+
+### Low-Level ReaScript API (RPR.MIDI_*)
+IMPORTANT: If you use the low-level \`reapy.reascript_api\` (aliased as RPR), MIDI functions
+require placeholder arguments for output parameters. The function returns a tuple with all values.
+
+CRITICAL: reapy's remote API may return numeric values as STRINGS. Always cast return values:
+- Use \`int()\` for note counts, pitch, velocity, channel
+- Use \`float()\` for PPQ positions, time values, quarter-note positions
+
+\`\`\`python
+RPR = reapy.reascript_api
+
+# Count MIDI events — pass 0 placeholders for the 3 output ints
+# Returns: (retval, take, notecnt, ccevtcnt, textsyxevtcnt) — take is at [1]!
+retval, _take, n_notes, n_cc, n_textsyx = RPR.MIDI_CountEvts(take, 0, 0, 0)
+# Or: n_notes = int(RPR.MIDI_CountEvts(take, 0, 0, 0)[2])  # [2] not [1]!
+
+# Get a note — pass placeholders for all 7 output params
+retval, take_out, idx, selected, muted, start_ppq, end_ppq, chan, pitch, vel = \\
+    RPR.MIDI_GetNote(take, note_index, False, False, 0, 0, 0, 0, 0)
+
+# Insert a note — no output params, call directly
+RPR.MIDI_InsertNote(take, selected, muted, start_ppq, end_ppq, chan, pitch, vel, noSortIn)
+
+# Delete a note by index
+RPR.MIDI_DeleteNote(take, note_index)
+
+# Sort after batch operations
+RPR.MIDI_Sort(take)
+
+# Convert between PPQ and project time
+ppq = RPR.MIDI_GetPPQPosFromProjQN(take, quarter_note_pos)
+qn = RPR.MIDI_GetProjQNFromPPQPos(take, ppq_pos)
+sec = RPR.MIDI_GetProjTimeFromPPQPos(take, ppq_pos)
 \`\`\`
 
 ### Useful Patterns
@@ -117,6 +192,31 @@ kick = next((t for t in project.tracks if "kick" in t.name.lower()), None)
 # Add FX chain
 eq = track.add_fx("ReaEQ")
 comp = track.add_fx("ReaComp")
+
+# Read MIDI notes from a track
+melody_track = next((t for t in project.tracks if "melody" in t.name.lower()), None)
+if melody_track and melody_track.n_items > 0:
+    take = melody_track.items[0].active_take
+    if take.is_midi:
+        for note in take.notes:
+            info = note.infos  # Most efficient: gets all props in one call
+            print(f"pitch={info['pitch']} start={info['start']:.3f} end={info['end']:.3f} vel={info['velocity']}")
+
+# Add harmony notes (thirds + fifths) to a harmony track
+harmony_track = next((t for t in project.tracks if "harmony" in t.name.lower()), None)
+melody_take = melody_track.items[0].active_take
+harmony_item = harmony_track.add_midi_item(start=melody_track.items[0].position,
+                                            end=melody_track.items[0].position + melody_track.items[0].length)
+harmony_take = harmony_item.active_take
+for note in melody_take.notes:
+    info = note.infos
+    # Major third above
+    harmony_take.add_note(start=info['start'], end=info['end'], pitch=info['pitch'] + 4,
+                          velocity=info['velocity'], unit='seconds', sort=False)
+    # Perfect fifth above
+    harmony_take.add_note(start=info['start'], end=info['end'], pitch=info['pitch'] + 7,
+                          velocity=info['velocity'], unit='seconds', sort=False)
+harmony_take.sort_events()
 
 # Always use print() to give feedback
 print(f"Done! Modified {track.name}")

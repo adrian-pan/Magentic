@@ -44,7 +44,9 @@ Rules:
 # Only expose MIDI-relevant tools to this agent
 _MIDI_TOOL_NAMES = {
     "create_track", "set_tempo", "create_midi_item",
-    "add_midi_notes", "analyze_project",
+    "add_midi_notes", "read_midi_notes", "extend_harmony",
+    "delete_midi_notes", "replace_harmony",
+    "analyze_project",
 }
 
 # Convert to OpenAI function-calling format

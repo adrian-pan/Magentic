@@ -10,11 +10,17 @@ import json
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
 
+import reapy
+import threading
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import re
 
 app = FastAPI(title="Magentic Bridge", version="1.0.0")
+REAPY_LOCK = threading.Lock()
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,53 +49,61 @@ class StatusResponse(BaseModel):
 @app.get("/status", response_model=StatusResponse)
 def get_status():
     """Check if REAPER is reachable via reapy."""
-    try:
-        import reapy
+    with REAPY_LOCK:
+        try:
+            # import reapy  <-- Removed
+    
+            version = reapy.get_reaper_version()
+            return StatusResponse(reaper_connected=True, reaper_version=version)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return StatusResponse(reaper_connected=False, error=f"{type(e).__name__}: {str(e)}")
 
-        version = reapy.get_reaper_version()
-        return StatusResponse(reaper_connected=True, reaper_version=version)
-    except Exception as e:
-        return StatusResponse(reaper_connected=False, error=str(e))
 
 
 @app.post("/execute", response_model=ExecuteResponse)
 def execute_code(request: ExecuteRequest):
     """Execute Python/reapy code in REAPER's context."""
-    try:
-        import reapy
-    except Exception as e:
-        return ExecuteResponse(
-            success=False,
-            error=f"Cannot connect to REAPER: {str(e)}. Make sure REAPER is open and reapy is configured.",
-        )
+    with REAPY_LOCK:
+        try:
+            # import reapy <-- Removed
+            pass
+    
+        except Exception as e:
+            return ExecuteResponse(
+                success=False,
+                error=f"Cannot connect to REAPER: {str(e)}. Make sure REAPER is open and reapy is configured.",
+            )
+    
+        # Capture stdout
+        stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
+    
+        # Build execution namespace with reapy pre-imported
+        namespace = {
+            "reapy": reapy,
+            "__builtins__": __builtins__,
+        }
+    
+        try:
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                exec(request.code, namespace)
+    
+            output = stdout_capture.getvalue()
+            errors = stderr_capture.getvalue()
+    
+            if errors:
+                return ExecuteResponse(success=True, output=output, error=errors)
+    
+            return ExecuteResponse(
+                success=True,
+                output=output or "Code executed successfully.",
+            )
+        except Exception as e:
+            tb = traceback.format_exc()
+            return ExecuteResponse(success=False, error=f"{str(e)}\n\n{tb}")
 
-    # Capture stdout
-    stdout_capture = io.StringIO()
-    stderr_capture = io.StringIO()
-
-    # Build execution namespace with reapy pre-imported
-    namespace = {
-        "reapy": reapy,
-        "__builtins__": __builtins__,
-    }
-
-    try:
-        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            exec(request.code, namespace)
-
-        output = stdout_capture.getvalue()
-        errors = stderr_capture.getvalue()
-
-        if errors:
-            return ExecuteResponse(success=True, output=output, error=errors)
-
-        return ExecuteResponse(
-            success=True,
-            output=output or "Code executed successfully.",
-        )
-    except Exception as e:
-        tb = traceback.format_exc()
-        return ExecuteResponse(success=False, error=f"{str(e)}\n\n{tb}")
 
 
 _ANALYZE_SCRIPT = """
@@ -109,24 +123,101 @@ print(_json.dumps({"success":True,"project":{"bpm":_RPR.Master_GetTempo(),"n_tra
 @app.get("/analyze")
 def analyze_project():
     """Analyze the current REAPER project and return its full state."""
-    try:
-        import reapy
-    except Exception as e:
-        return {"success": False, "error": f"Cannot connect to REAPER: {str(e)}"}
+    with REAPY_LOCK:
+        try:
+            # import reapy <-- Removed
+            pass
+    
+        except Exception as e:
+            return {"success": False, "error": f"Cannot connect to REAPER: {str(e)}"}
+    
+        stdout_buf = io.StringIO()
+        stderr_buf = io.StringIO()
+        ns = {"reapy": reapy, "__builtins__": __builtins__}
+        try:
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                exec(_ANALYZE_SCRIPT, ns)
+            out = stdout_buf.getvalue().strip()
+            if not out:
+                err = stderr_buf.getvalue().strip()
+                return {"success": False, "error": err or "No output from analyze script"}
+            return json.loads(out)
+        except Exception as e:
+            return {"success": False, "error": f"{str(e)}\n{stderr_buf.getvalue()}"}
 
-    stdout_buf = io.StringIO()
-    stderr_buf = io.StringIO()
-    ns = {"reapy": reapy, "__builtins__": __builtins__}
+
+
+def get_installed_instruments():
+    """
+    Scans REAPER's resource path for reaper-vstplugins*.ini and reaper-auplugins*.ini
+    to find installed instruments.
+    """
+    instruments = []
+    
+    # Standard macOS REAPER resource path
+    resource_path = os.path.expanduser("~/Library/Application Support/REAPER")
+    
+    # 1. Scan VST plugins
+    # Look for reaper-vstplugins*.ini
     try:
-        with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-            exec(_ANALYZE_SCRIPT, ns)
-        out = stdout_buf.getvalue().strip()
-        if not out:
-            err = stderr_buf.getvalue().strip()
-            return {"success": False, "error": err or "No output from analyze script"}
-        return json.loads(out)
+        for filename in os.listdir(resource_path):
+            if filename.startswith("reaper-vstplugins") and filename.endswith(".ini"):
+                path = os.path.join(resource_path, filename)
+                with open(path, "r", errors="ignore") as f:
+                    for line in f:
+                        # Format: filename=id,id,Name (Developer)!!!VSTi
+                        if "!!!VSTi" in line:
+                            # Extract name
+                            parts = line.split(",")
+                            if len(parts) >= 3:
+                                raw_name = parts[2]
+                                # Remove !!!VSTi and optional (Developer)
+                                name = raw_name.replace("!!!VSTi", "").strip()
+                                # Simple heuristic to remove developer suffix if present in parens at end
+                                # But sometimes it's part of the name, so let's just keep it for now or minimal clean
+                                
+                                # The filename is the identifier for VSTs in many contexts, 
+                                # but usually we need the name for reascript AddFx
+                                
+                                instruments.append({
+                                    "type": "VST",
+                                    "name": name,
+                                    "raw": raw_name.strip()
+                                })
     except Exception as e:
-        return {"success": False, "error": f"{str(e)}\n{stderr_buf.getvalue()}"}
+        print(f"Error scanning VSTs: {e}")
+
+    # 2. Scan AU plugins
+    # Look for reaper-auplugins*.ini
+    try:
+        for filename in os.listdir(resource_path):
+            if filename.startswith("reaper-auplugins") and filename.endswith(".ini"):
+                path = os.path.join(resource_path, filename)
+                with open(path, "r", errors="ignore") as f:
+                    for line in f:
+                        # Format: Manufacturer: Plugin Name=<inst>
+                        if "=<inst>" in line:
+                            content = line.split("=<inst>")[0]
+                            # content is like "Apple: DLSMusicDevice"
+                            # For AU, the name we pass to AddFx is usually "AU:Plugin Name" or "AU:Manufacturer: Plugin Name"
+                            # Let's store a usable identifier
+                            
+                            instruments.append({
+                                "type": "AU",
+                                "name": content, # e.g. "Apple: DLSMusicDevice"
+                                "ident": f"AU:{content}"
+                            })
+    except Exception as e:
+        print(f"Error scanning AUs: {e}")
+        
+    return instruments
+
+
+@app.get("/analyze/instruments")
+def analyze_instruments():
+    """Return a list of installed virtual instruments."""
+    insts = get_installed_instruments()
+    return {"success": True, "instruments": insts}
 
 
 @app.get("/")
@@ -137,7 +228,9 @@ def root():
         "endpoints": {
             "GET /status": "Check REAPER connection",
             "POST /execute": "Execute reapy code in REAPER",
+            "POST /execute": "Execute reapy code in REAPER",
             "GET /analyze": "Analyze current REAPER project state",
+            "GET /analyze/instruments": "List installed VST/AU instruments",
         },
     }
 
@@ -149,5 +242,6 @@ if __name__ == "__main__":
     print(f"\n🧲 Magentic Bridge starting on http://localhost:{port}")
     print("   POST /execute  — Run reapy code in REAPER")
     print("   GET  /analyze  — Read full REAPER project state")
+    print("   GET  /analyze/instruments — List installed instruments")
     print("   GET  /status   — Check REAPER connection\n")
     uvicorn.run(app, host="0.0.0.0", port=port)
