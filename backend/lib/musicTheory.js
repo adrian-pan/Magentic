@@ -339,13 +339,15 @@ const MUSIC_TERMS = [
     // ===================================================================
 
     // --- Hip-Hop & Rap ---
+    // DRUM GRID KEY: 16 steps per bar (16th notes). x = hit, - = rest, o = soft/ghost hit.
+    // Steps map to: 1 e + a 2 e + a 3 e + a 4 e + a
     {
         name: "Trap Music",
         category: "genre",
         aliases: ["trap", "trap beat", "trap production", "atlanta trap", "trap music production"],
         definition: "A Hip-Hop subgenre featuring heavy 808 bass, rapid hi-hats, dark melodies, and a half-time feel. Usually 130-170 BPM (in half-time, so it feels like 65-85).",
         context: "Originated in Atlanta. Defined by producers like Lex Luger, Metro Boomin, Southside, and TM88.",
-        beginner_tip: "Recipe: 140 BPM, half-time snare on beat 3, fast hi-hat rolls, deep 808 bass with slides, dark minor key melodies. Start with the 808 pattern — it drives the whole beat.",
+        beginner_tip: "140 BPM, 4/4. 16-step grid (one bar): Kick: x--x------x----- | Snare: --------x------- | HiHat: x-x-x-x-xxxx-xxx | 808: x--x------x----- (follows kick). The snare only hits on beat 3 (step 9) — that's the 'half-time' feel. Hi-hats speed up into rolls (steps 9-12, 14-16) using 16th or even 32nd notes. The 808 bass plays the same rhythm as the kick but sustains and slides between notes.",
     },
     {
         name: "Boom Bap (genre)",
@@ -353,7 +355,7 @@ const MUSIC_TERMS = [
         aliases: ["boom bap beat", "90s hip hop", "old school hip hop beat", "classic hip hop beat", "east coast hip hop"],
         definition: "The classic 90s Hip-Hop sound built on punchy sampled drums, chopped soul/jazz samples, and a raw, unpolished aesthetic. Usually 85-100 BPM with swing.",
         context: "The golden era sound. Think DJ Premier, Pete Rock, J Dilla, 9th Wonder, Madlib. Often uses vinyl samples and an MPC workflow.",
-        beginner_tip: "Recipe: 90 BPM, punchy kick + crispy snare with 55-60% swing, a chopped piano or soul sample, simple bassline following the root notes. Keep it raw — don't over-polish.",
+        beginner_tip: "90 BPM, 4/4 with 55-60% swing. 16-step grid: Kick: x-----x---x----- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- (8th notes). The 'boom' is the kick (steps 1, 7, 11), the 'bap' is the snare on beats 2 and 4 (steps 5, 13). Apply SWING to the hi-hats — this shifts every other hi-hat slightly late, giving that lopsided, groovy feel. Without swing it sounds stiff and wrong.",
     },
     {
         name: "Drill",
@@ -361,7 +363,7 @@ const MUSIC_TERMS = [
         aliases: ["drill beat", "uk drill", "ny drill", "chicago drill", "drill music"],
         definition: "A dark, aggressive subgenre with sliding 808s, bouncy hi-hat patterns, and menacing melodies. UK Drill runs 140-145 BPM; NY Drill is similar but with different drum bounce.",
         context: "Started in Chicago (Chief Keef era), evolved in the UK (67, Headie One), then NYC (Pop Smoke, Sheff G). Each region has a distinct flavor.",
-        beginner_tip: "Recipe: 140 BPM, half-time snare, fast hi-hats with triplet rolls, sliding 808 bass (use pitch glide/portamento), dark piano or string melodies in minor key.",
+        beginner_tip: "140 BPM, 4/4 (UK Drill). 16-step grid: Kick: x---------x---x- | Snare: --------x------- | HiHat: x-xxx-x-x-xxx-x- | 808: x---------x---x- (slides between pitches). Key difference from Trap: the hi-hat pattern is bouncier — triplet groups on steps 3-5 and 11-13 give it that 'skipping' feel. The 808 uses pitch slides (portamento/glide) between notes. Snare on beat 3 only (half-time).",
     },
     {
         name: "Lo-Fi Hip-Hop",
@@ -369,7 +371,7 @@ const MUSIC_TERMS = [
         aliases: ["lofi", "lo-fi", "lo fi beat", "chill beat", "study beat", "lofi hip hop", "chillhop"],
         definition: "A mellow, nostalgic subgenre featuring dusty drums, jazzy chords, vinyl crackle, and a laid-back swing feel. Usually 70-90 BPM.",
         context: "Popularized by the 'lofi hip hop radio' streams. Influenced by J Dilla, Nujabes, and MadLib.",
-        beginner_tip: "Recipe: 75 BPM, boom-bap drums with heavy swing, jazz piano chords (7ths and 9ths), vinyl crackle FX, and a low-pass filter on everything to make it sound warm and old.",
+        beginner_tip: "75 BPM, 4/4 with 60-70% swing. 16-step grid: Kick: x-----x-----x--- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- (swung 8ths). Same boom-bap skeleton but SLOWER and with HEAVY swing. Add jazz piano chords (Dm7-G7-Cmaj7-Am7), a vinyl crackle layer, and a low-pass filter on the master bus cutting everything above ~8kHz to make it sound warm/old. Drums should sound dusty, not crisp.",
     },
     {
         name: "Phonk",
@@ -377,7 +379,7 @@ const MUSIC_TERMS = [
         aliases: ["phonk beat", "drift phonk", "memphis phonk", "cowbell phonk", "gym phonk"],
         definition: "A dark, distorted subgenre blending Memphis rap aesthetics with aggressive bass, cowbell patterns, and chopped vocal samples. Usually 130-160 BPM.",
         context: "Rooted in 90s Memphis rap (Three 6 Mafia, DJ Screw). Modern 'drift phonk' went viral on TikTok/car culture. Producers: KORDHELL, DVRST, Freddie Dredd.",
-        beginner_tip: "Recipe: 140 BPM, distorted 808 kick, cowbell on every beat, aggressive hi-hats, heavy bass, pitched-down vocal chops, and lots of distortion/saturation on everything.",
+        beginner_tip: "140 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- (four-on-the-floor) | Snare: ----x-------x--- | Cowbell: x---x---x---x--- (same as kick) | HiHat: x-x-x-x-x-x-x-x-. The cowbell hitting on every beat is the signature phonk sound. Distort/saturate EVERYTHING — the kick, the bass, even the master bus. Add pitched-down vocal chops between beats. The whole mix should feel aggressive and overdriven.",
     },
     {
         name: "Pluggnb / Plugg",
@@ -385,7 +387,7 @@ const MUSIC_TERMS = [
         aliases: ["plugg", "pluggnb", "plug beat", "plugg beat", "rage beat"],
         definition: "A dreamy, melodic Hip-Hop subgenre with floaty synths, soft 808s, and ethereal bells/plucks. Usually 140-160 BPM in half-time.",
         context: "Popularized by producers like F1lthy, Pi'erre Bourne, and artists like Playboi Carti, Destroy Lonely, Ken Carson.",
-        beginner_tip: "Recipe: 150 BPM half-time, soft/round 808, dreamy bell or pluck melodies, light hi-hats, lots of reverb on everything. The vibe is spacey and hypnotic.",
+        beginner_tip: "150 BPM, 4/4 half-time. 16-step grid: Kick: x-------x------- | Snare: --------x------- | HiHat: x-x-x-x-x-x-x-x- | 808: x-------x------- (soft, round). Very sparse drums — kick on beat 1 (step 1) and the 'and' of 2 (step 5), snare on beat 3 only. The 808 is SOFT and round (not distorted). The melody carries this genre — use bells, plucks, or flutes with lots of reverb and delay. Everything should feel floaty and dreamlike.",
     },
     {
         name: "Trap Soul / R&B Trap",
@@ -393,7 +395,7 @@ const MUSIC_TERMS = [
         aliases: ["trapsoul", "trap soul", "rnb trap", "modern rnb", "dark rnb", "bryson tiller type"],
         definition: "A fusion of Trap production with R&B vocals and songwriting. Features 808s and trap drums but with smoother, more melodic elements. Usually 120-140 BPM.",
         context: "Defined by Bryson Tiller's 'TRAPSOUL' album. Also: The Weeknd, 6LACK, Summer Walker, SZA. Bridges hip-hop and R&B.",
-        beginner_tip: "Recipe: 130 BPM, muted/soft 808, snappy snare, gentle hi-hats, warm pad chords, smooth guitar or piano melody. Leave space for vocals — don't overcrowd the beat.",
+        beginner_tip: "130 BPM, 4/4 half-time. 16-step grid: Kick: x-----x--------- | Snare: --------x------- | HiHat: x-x-x-x-x-x-x-x- | 808: x-----x--------- (muted/short). Similar grid to Trap but softer — the 808 is shorter and muted (not booming), the snare is snappy but not hard, hi-hats are gentle. Add warm pads, guitar, or piano. Leave LOTS of space between elements — this genre is about breathing room for vocals.",
     },
 
     // --- Electronic / Dance ---
@@ -403,7 +405,7 @@ const MUSIC_TERMS = [
         aliases: ["house", "deep house", "house beat", "house music production", "classic house"],
         definition: "Electronic dance music built on a four-on-the-floor kick, off-beat hi-hats, soulful chords/vocals, and a groove-focused bassline. Usually 120-130 BPM.",
         context: "Born in Chicago in the 1980s. The grandfather of most modern dance music. Frankie Knuckles, Larry Heard, Marshall Jefferson.",
-        beginner_tip: "Recipe: 124 BPM, kick on every beat, open hi-hat on every off-beat, clap/snare on 2 and 4, a groovy bassline, and warm pads or vocal chops.",
+        beginner_tip: "124 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- (every beat) | Clap: ----x-------x--- (beats 2+4) | OpenHat: --x---x---x---x- (every off-beat) | ClosedHat: x-x-x-x-x-x-x-x-. This is the most fundamental dance pattern. Kick on every quarter note (steps 1,5,9,13), clap/snare on 2 and 4, open hat on every 'and' (off-beat). Once this groove is locked, add a syncopated bassline and chord stabs.",
     },
     {
         name: "Tech House",
@@ -411,7 +413,7 @@ const MUSIC_TERMS = [
         aliases: ["tech house beat", "tech house production", "fisher style", "chris lake style"],
         definition: "A fusion of House and Techno — the groove and warmth of House with the driving, hypnotic energy of Techno. Usually 124-130 BPM.",
         context: "Huge in modern club culture. Artists: Fisher, Chris Lake, Patrick Topping, Green Velvet. Focuses on bass-heavy grooves and minimal melodies.",
-        beginner_tip: "Recipe: 126 BPM, punchy four-on-the-floor kick, tight hi-hats, a deep rolling bassline (often with a filter sweep), minimal melodic elements, and percussive groove layers.",
+        beginner_tip: "126 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Clap: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- | Perc: --x-------x----- (shaker/rim on off-beats). Same four-on-the-floor foundation as House but PUNCHIER kick and a deeper, rolling bassline. Add a percussion layer (rim shots, shakers, congas) with syncopated rhythms. The bassline often uses a filter sweep that opens and closes over 4-8 bars.",
     },
     {
         name: "Techno",
@@ -419,7 +421,7 @@ const MUSIC_TERMS = [
         aliases: ["techno beat", "techno production", "detroit techno", "dark techno", "industrial techno"],
         definition: "Repetitive, driving electronic music focused on rhythm and atmosphere over melody. Dark, hypnotic, and relentless. Usually 125-150 BPM.",
         context: "Born in Detroit in the 1980s. Pioneers: Juan Atkins, Derrick May, Kevin Saunderson. Modern: Amelie Lens, Charlotte de Witte, Adam Beyer.",
-        beginner_tip: "Recipe: 130 BPM, hard four-on-the-floor kick, closed hi-hat on off-beats, clap on 2 and 4, a dark droning bassline, and atmospheric textures (pads, noise, metallic hits). Less is more.",
+        beginner_tip: "130 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- (hard, punchy) | Clap: ----x-------x--- | ClosedHat: --x---x---x---x- | Ride: x-x-x-x-x-x-x-x-. Similar to House but HARDER and DARKER. The kick is heavier and more distorted. Hi-hats are tighter and more metallic. Minimal melody — just a dark, droning bassline and atmospheric textures (reverb tails, industrial noise, metallic hits). Repetition IS the point.",
     },
     {
         name: "Dubstep",
@@ -427,7 +429,7 @@ const MUSIC_TERMS = [
         aliases: ["dubstep beat", "brostep", "riddim", "heavy dubstep", "wub wub", "bass music"],
         definition: "An aggressive bass-heavy genre with a half-time feel, heavy wobble bass, and dramatic build-ups/drops. Usually 140-150 BPM in half-time.",
         context: "Originated in UK (Skream, Benga), evolved into 'brostep' (Skrillex). Subgenres: Riddim (minimal, repetitive), Melodic Dubstep (Seven Lions), Tearout.",
-        beginner_tip: "Recipe: 140 BPM half-time, massive kick on 1, snare on 3, wobble bass made with an LFO on filter cutoff, huge build-ups with risers, and a devastating drop. Go big or go home.",
+        beginner_tip: "140 BPM, 4/4 half-time. 16-step grid: Kick: x--------------- | Snare: --------x------- | HiHat: --x---x---x---x-. VERY sparse drums — kick ONLY on beat 1 (step 1), snare ONLY on beat 3 (step 9). The space between is filled by the WOBBLE BASS (made by putting an LFO on a filter cutoff — the speed of the LFO creates the 'wub-wub' rhythm). Build-up: 16-32 bars of rising snare rolls + riser FX, then DROP into the wobble bass.",
     },
     {
         name: "Future Bass",
@@ -435,7 +437,7 @@ const MUSIC_TERMS = [
         aliases: ["future bass beat", "kawaii bass", "flume style", "supersaws", "melodic edm"],
         definition: "A colorful, emotional EDM subgenre featuring detuned supersaw chords, pitched vocal chops, and uplifting melodies with wobbly sidechain bass. Usually 130-160 BPM.",
         context: "Popularized by Flume, Marshmello, San Holo, Illenium. Bridges pop-friendly melodies with electronic bass music.",
-        beginner_tip: "Recipe: 150 BPM, supersaw chords with sidechain pumping, pitched-up vocal chops, snappy trap-style drums, and a bright, major-key melody. Use lots of reverb for that wide, dreamy sound.",
+        beginner_tip: "150 BPM, 4/4 half-time. 16-step grid: Kick: x-------x------- | Snare: --------x------- | HiHat: x-x-x-x-x-x-x-x-. Same half-time skeleton as Dubstep but BRIGHTER. The drop features huge supersaw chords that 'pump' via sidechain compression (the chord ducks every time the kick hits, creating that rhythmic breathing effect). Add pitched-up vocal chops (chop a vocal sample and pitch each piece to form a melody).",
     },
     {
         name: "Drum & Bass",
@@ -443,7 +445,7 @@ const MUSIC_TERMS = [
         aliases: ["dnb", "drum and bass", "jungle", "d&b", "liquid dnb", "neurofunk"],
         definition: "A fast-paced electronic genre built on breakbeat drums and heavy bass. Usually 160-180 BPM.",
         context: "Originated in the UK rave scene. Subgenres: Liquid (smooth, musical), Neurofunk (dark, technical), Jump-Up (bouncy, aggressive).",
-        beginner_tip: "Recipe: 174 BPM, a chopped breakbeat (the 'Amen break' is classic), a heavy sub-bass that moves, and energetic synths or pads. The drum pattern is everything in DnB.",
+        beginner_tip: "174 BPM, 4/4. 16-step grid (two-step pattern): Kick: x-------x------- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x-. BUT the signature DnB feel comes from a BREAKBEAT — instead of the grid above, chop up the 'Amen break' or similar drum loop. The kick and snare don't follow a straight grid; they syncopate. The sub-bass is deep and moves (different notes, not just one droning note). At 174 BPM, 8th-note hi-hats feel like a wall of energy.",
     },
     {
         name: "Trance",
@@ -451,7 +453,7 @@ const MUSIC_TERMS = [
         aliases: ["trance beat", "trance music", "uplifting trance", "psytrance", "progressive trance"],
         definition: "Euphoric, melodic electronic music with long build-ups, soaring synth leads, and a driving four-on-the-floor beat. Usually 128-145 BPM (Psytrance: 145-150).",
         context: "Peaked in the late 90s/2000s (Tiesto, Armin van Buuren, Paul van Dyk). Still huge globally. Psytrance is the harder, trippier cousin.",
-        beginner_tip: "Recipe: 138 BPM, four-on-the-floor kick, rolling bassline, a soaring lead synth melody with lots of delay, long 32-bar build-ups, and an emotional breakdown in the middle.",
+        beginner_tip: "138 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Clap: ----x-------x--- | OpenHat: --x---x---x---x- | ClosedHat: x-x-x-x-x-x-x-x-. Same four-on-the-floor as House but FASTER and more DRIVING. The bassline is a rolling 16th-note pattern (x-x-x-x-x-x-x-x- on bass synth) that creates constant forward momentum. Build-ups are LONG (32 bars), using snare rolls that accelerate from 4th→8th→16th→32nd notes before the drop.",
     },
     {
         name: "EDM / Big Room",
@@ -459,7 +461,7 @@ const MUSIC_TERMS = [
         aliases: ["edm", "big room", "festival edm", "mainstage", "electro house", "big room house"],
         definition: "High-energy festival electronic music with massive build-ups, a simple drop (often just a kick + lead), and crowd-friendly simplicity. Usually 126-132 BPM.",
         context: "The 'festival sound' of 2012-2016 (Martin Garrix, Dimitri Vegas & Like Mike, Hardwell). Still popular at mainstage events.",
-        beginner_tip: "Recipe: 128 BPM, huge build-up with snare rolls and risers, a simple catchy lead melody, then drop everything to just kick + lead. Big Room is all about the drop moment.",
+        beginner_tip: "128 BPM, 4/4. Drop grid: Kick: x---x---x---x--- | nothing else — just kick + a big lead synth melody. Build-up grid: Snare: ----x---x---x-x- → ----x-x-x-x-xxxx (accelerating). The whole genre is about the BUILD-UP → DROP contrast. Strip everything to just a vocal/riser during the build, add accelerating snare rolls, then DROP to just the kick and one massive lead synth. Simplicity is power.",
     },
     {
         name: "Garage / UK Garage",
@@ -467,7 +469,7 @@ const MUSIC_TERMS = [
         aliases: ["uk garage", "2-step", "ukg", "speed garage", "garage beat", "2 step"],
         definition: "A skippy, shuffled dance genre with a distinctive 2-step drum pattern (kick-hat-snare-hat but with the kick slightly off-grid). Usually 130-140 BPM.",
         context: "Born in the UK in the 90s (MJ Cole, Todd Edwards, Craig David). Influenced Dubstep, Grime, and modern Bass music.",
-        beginner_tip: "Recipe: 135 BPM, a shuffled 2-step kick pattern (not straight like house), snappy snares, warm sub-bass, chopped vocal samples, and organ or piano stabs. The rhythm is everything.",
+        beginner_tip: "135 BPM, 4/4. 16-step grid: Kick: x---------x----- | Snare: ------x-------x- | HiHat: x-x-x-x-x-x-x-x-. The key is the SHUFFLE — the kick is NOT on every beat (only steps 1 and 11), and the snare is displaced to steps 7 and 15 instead of the usual 5 and 13. This creates that 'skipping' 2-step feel. The kick pattern should feel like it's stumbling forward. Add warm sub-bass, vocal chops, and piano/organ stabs.",
     },
     {
         name: "Synthwave / Retrowave",
@@ -475,7 +477,7 @@ const MUSIC_TERMS = [
         aliases: ["synthwave", "retrowave", "outrun", "80s synth", "vaporwave", "retro electronic"],
         definition: "A nostalgic electronic genre inspired by 1980s synth-pop, movie soundtracks, and video game music. Features analog-style synths, gated reverb drums, and arpeggiated basslines.",
         context: "Popularized by the 'Drive' movie soundtrack and artists like Kavinsky, The Midnight, Perturbator, and Com Truise.",
-        beginner_tip: "Recipe: 100-120 BPM, big gated reverb snare, punchy electronic kick, arpeggiated synth bassline, lush pad chords, and a soaring lead synth. Everything should sound '80s' — use retro synth presets.",
+        beginner_tip: "110 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Snare: ----x-------x--- (BIG gated reverb) | HiHat: x-x-x-x-x-x-x-x-. Straightforward pattern but the SNARE defines the sound — it should have a long gated reverb tail (the classic '80s Phil Collins sound'). Bass is an arpeggiated synth pattern: root-5th-octave-5th repeated (e.g., C2-G2-C3-G2 in 16th notes). Add lush analog pad chords and a soaring lead synth on top.",
     },
     {
         name: "Ambient",
@@ -483,7 +485,7 @@ const MUSIC_TERMS = [
         aliases: ["ambient music", "ambient production", "atmospheric", "brian eno", "chill ambient", "dark ambient"],
         definition: "Atmospheric, textural music focused on mood and space rather than rhythm or melody. Can be peaceful or dark. Often no drums at all.",
         context: "Pioneered by Brian Eno. Used in film scores, meditation, and as interludes in albums. Modern: Aphex Twin (Selected Ambient Works), Tim Hecker.",
-        beginner_tip: "Recipe: no set BPM, long sustained pad chords with lots of reverb, subtle evolving textures (use LFOs on filter/pitch), field recordings or nature sounds. Focus on creating a mood, not a beat.",
+        beginner_tip: "No drum grid — Ambient usually has NO beat. Instead: play a long sustained chord (like Am7) on a pad synth, add 50-80% reverb and 30-50% delay. Automate the filter cutoff to slowly open and close over 16-32 bars. Layer nature sounds or field recordings underneath. If you do want subtle rhythm, use a very quiet, slow hi-hat: x-------x------- at ~70 BPM. The goal is atmosphere, not rhythm.",
     },
 
     // --- Pop & Mainstream ---
@@ -493,7 +495,7 @@ const MUSIC_TERMS = [
         aliases: ["pop", "pop beat", "pop music", "modern pop", "top 40", "radio pop"],
         definition: "Mainstream popular music production. Focuses on catchy hooks, clean mixing, and a clear vocal-forward arrangement. Usually 100-130 BPM.",
         context: "Pop borrows from every genre. Modern pop often blends elements of EDM, Trap, R&B, and Indie.",
-        beginner_tip: "Recipe: clean drums (not too heavy), a memorable 4-chord progression, a catchy top-line melody, and lots of space for vocals. Keep it simple — the best pop songs have surprisingly few elements.",
+        beginner_tip: "120 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x-. Clean, simple, not too heavy. The drums sit BEHIND the vocal — they support, not dominate. Use a 4-chord progression (try C-G-Am-F, each chord for 1 bar). Keep the arrangement minimal in verses (just kick + bass + chords) and add layers in the chorus (full drums + synths + harmonies). Space for vocals is #1 priority.",
     },
     {
         name: "Indie Pop / Bedroom Pop",
@@ -501,7 +503,7 @@ const MUSIC_TERMS = [
         aliases: ["indie pop", "bedroom pop", "indie beat", "chill indie", "clairo style", "boy pablo style"],
         definition: "Lo-fi, intimate pop with a DIY aesthetic — dreamy guitars, soft vocals, simple production, and a warm, imperfect character. Usually 90-130 BPM.",
         context: "The 'bedroom producer' sound. Artists: Clairo, Boy Pablo, Rex Orange County, Gus Dapperton, beabadoobee.",
-        beginner_tip: "Recipe: 110 BPM, simple drum machine beat, jangly or clean electric guitar chords, soft bass, and a dreamy vocal with lots of reverb. Imperfection is part of the charm.",
+        beginner_tip: "110 BPM, 4/4. 16-step grid: Kick: x-------x------- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- (or a shaker instead). Deliberately SIMPLE and slightly imperfect. Use a basic drum machine (not live-sounding drums). The kick is soft and plays less often. Add a clean or jangly guitar strumming 8th notes, a simple bass, and breathy vocals with lots of reverb. Don't quantize perfectly — a little timing sloppiness is part of the charm.",
     },
     {
         name: "Hyperpop",
@@ -509,7 +511,7 @@ const MUSIC_TERMS = [
         aliases: ["hyperpop", "hyper pop", "pc music", "100 gecs style", "charli xcx style", "glitchpop"],
         definition: "An experimental, maximalist pop subgenre that exaggerates pop conventions — pitched vocals, distorted 808s, glitchy production, and chaotic energy. Usually 130-170 BPM.",
         context: "Pioneered by PC Music (A.G. Cook, SOPHIE) and popularized by 100 gecs, Charli XCX, Bladee. Embraces excess and genre-bending.",
-        beginner_tip: "Recipe: 150 BPM, distorted everything, pitch-shifted vocals (up or down), glitchy edits, 808s pushed into distortion, pop chord progressions but with chaotic sound design layered on top.",
+        beginner_tip: "150 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Snare: ----x-------x--- | HiHat: xxxxxxxxxxxx xxxx (all 16th notes). Take a basic pop drum pattern and BREAK IT — pitch the snare up 12 semitones, distort the 808 until it clips, add glitchy stutters (chop and repeat random 1/32 sections). The vocal is pitched up +5 to +12 semitones with heavy autotune. The chord progression is normal pop (I-V-vi-IV) but everything around it is chaotic.",
     },
 
     // --- R&B & Soul ---
@@ -519,7 +521,7 @@ const MUSIC_TERMS = [
         aliases: ["rnb", "r&b", "neo soul", "modern rnb", "contemporary rnb", "soul music", "r and b"],
         definition: "Rhythm and Blues — smooth, groove-based music centered on vocals, jazz-influenced chords, and laid-back drums. Neo-Soul adds organic, live-instrument textures.",
         context: "Classic R&B: Marvin Gaye, Stevie Wonder. Neo-Soul: D'Angelo, Erykah Badu, Frank Ocean. Modern: Daniel Caesar, SZA, Steve Lacy.",
-        beginner_tip: "Recipe: 80-100 BPM, soft kick + snappy snare, smooth electric bass, warm Rhodes/Wurlitzer piano chords with 7ths and 9ths, and space for a vocal melody. Groove and feel matter more than complexity.",
+        beginner_tip: "90 BPM, 4/4 with light swing. 16-step grid: Kick: x-----x---x----- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- (swung). Ghost notes are KEY — add very soft snare hits (o) on the 16th notes around the main snare: --oo----x-oo--x-oo. The bass is smooth and melodic (not just root notes). Chords use 7ths and 9ths (Dm9-G13-Cmaj9-Am7). Use a Rhodes or Wurlitzer piano. Everything should feel SMOOTH and laid-back.",
     },
 
     // --- Rock & Alternative ---
@@ -529,7 +531,7 @@ const MUSIC_TERMS = [
         aliases: ["rock", "rock beat", "rock music", "guitar music", "rock production", "indie rock", "alternative rock"],
         definition: "Guitar-driven music with a live band feel — drums, bass, guitar(s), and vocals. Production ranges from raw and gritty to polished and layered.",
         context: "The broadest genre. Subgenres: Punk (fast, aggressive), Grunge (heavy, distorted), Indie Rock (quirky, lo-fi), Pop Rock (radio-friendly), Metal (extreme).",
-        beginner_tip: "Recipe: 120 BPM, live-sounding kick/snare/hat pattern, distorted electric guitar chords, bass following the guitar root notes, and maybe a lead guitar melody. Use room reverb on drums for a 'live' feel.",
+        beginner_tip: "120 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- | Crash: x--------------- (on beat 1 of new sections). Standard rock beat — kick on every quarter note, snare on 2 and 4, hi-hat on 8th notes. Add a crash cymbal on beat 1 of each new section (verse, chorus). Variations: open the hi-hat on beat 4 (step 13→open hat instead of closed), or add a kick on the 'and' of 4 (step 15) as a pickup into the next bar.",
     },
     {
         name: "Metal / Heavy Rock",
@@ -537,7 +539,7 @@ const MUSIC_TERMS = [
         aliases: ["metal", "heavy metal", "metalcore", "djent", "death metal", "heavy rock"],
         definition: "Aggressive, heavy guitar-driven music with distorted guitars, fast double-kick drums, and intense energy. Tuned down for extra heaviness.",
         context: "Subgenres: Thrash (Metallica), Death Metal (extreme), Djent (polyrhythmic, Meshuggah), Metalcore (breakdowns, Bring Me The Horizon).",
-        beginner_tip: "Recipe: 100-180 BPM, heavily distorted downtuned guitars, double-kick drum patterns, palm-muted riffs, breakdowns (half-time heavy sections). Use amp sim plugins for guitar tones.",
+        beginner_tip: "160 BPM, 4/4. 16-step grid (double kick): Kick: xxxxxxxxxxxxxxxx (constant 16th notes on double bass pedal) | Snare: ----x-------x--- | HiHat/Ride: x-x-x-x-x-x-x-x-. The double kick is the signature — a wall of constant 16th-note kicks. For a BREAKDOWN (half-time section): Kick: x-----------x--- | Snare: --------x------- at half the tempo, with palm-muted guitar chugging on 8th notes. Guitars are tuned down (drop D or lower) and heavily distorted.",
     },
 
     // --- Latin & Caribbean ---
@@ -547,7 +549,7 @@ const MUSIC_TERMS = [
         aliases: ["reggaeton beat", "reggaeton production", "dembow beat", "latin trap", "perreo", "bad bunny style"],
         definition: "Latin urban music built on the iconic Dem Bow riddim — a syncopated kick-snare pattern that's instantly recognizable. Usually 85-100 BPM.",
         context: "Exploded globally via Daddy Yankee, Bad Bunny, J Balvin, Ozuna. Modern reggaeton often blends with Trap and Pop.",
-        beginner_tip: "Recipe: 95 BPM, the classic Dem Bow drum pattern (kick on 1 and 3, snare on every off-beat), a simple bass pattern, and a catchy melodic hook. The drum pattern IS reggaeton — get that right and you're 80% there.",
+        beginner_tip: "95 BPM, 4/4. The DEM BOW riddim (16-step grid): Kick: x--x--x---x----- | Snare: ---x--x---x--x-- | HiHat: x-x-x-x-x-x-x-x-. The magic is the KICK-SNARE interplay — they alternate in a syncopated call-and-response. Steps 1,4,7 are kick; steps 4,7,11,14 are snare (some overlap). If you get this pattern right, it instantly sounds like reggaeton. Add a simple bass following the kick pattern and a melodic hook on top.",
     },
     {
         name: "Afrobeats",
@@ -555,7 +557,7 @@ const MUSIC_TERMS = [
         aliases: ["afrobeat", "afrobeats", "afro beat", "amapiano", "afro pop", "burna boy style", "wizkid style"],
         definition: "A broad term for modern African-influenced pop music with infectious rhythms, log drums, shakers, and a bouncy, percussive groove. Usually 100-120 BPM.",
         context: "Global phenomenon led by Burna Boy, Wizkid, Davido, Tems, Rema. Amapiano is a South African subgenre with log drums and deep basslines.",
-        beginner_tip: "Recipe: 108 BPM, bouncy kick pattern, shaker or hi-hat grooves, log drum hits (for Amapiano), percussive guitar, warm pads, and call-and-response vocal melodies. The groove should make you dance.",
+        beginner_tip: "108 BPM, 4/4. 16-step grid: Kick: x-----x---x-x--- | Snare: ----x-----x----- | Shaker: xxxxxxxxxxxxxxxx (constant 16ths) | Perc: --x---x-----x---. The shaker running constant 16th notes is the PULSE of Afrobeats. The kick is bouncy and syncopated (steps 1,7,11,13). Add a percussive muted guitar on off-beats and call-and-response vocal melodies. The groove should make you MOVE — if you're not nodding your head, the rhythm isn't right.",
     },
     {
         name: "Dancehall",
@@ -563,7 +565,7 @@ const MUSIC_TERMS = [
         aliases: ["dancehall beat", "dancehall production", "jamaican dancehall", "bashment"],
         definition: "Jamaican-rooted dance music with heavy bass, digital riddims, and an energetic, bouncy rhythm. Usually 90-110 BPM.",
         context: "Roots in Jamaica. Artists: Vybz Kartel, Sean Paul, Popcaan, Shenseea. Heavily influenced Reggaeton, Moombahton, and modern Pop.",
-        beginner_tip: "Recipe: 100 BPM, punchy electronic kick + snare pattern, heavy sub-bass, digital/synthetic instrument sounds, and a catchy rhythmic vocal hook. The riddim (instrumental) is shared between multiple artists in dancehall culture.",
+        beginner_tip: "100 BPM, 4/4. 16-step grid: Kick: x--x----x--x---- | Snare: -------x-------x | HiHat: x-x-x-x-x-x-x-x-. The snare hits on the 'and' of beat 2 (step 8) and 'and' of beat 4 (step 16) — NOT on 2 and 4 like most genres. This gives dancehall its distinctive bounce. The kick doubles on steps 1-4 for a 'ba-dum' effect. Add a heavy sub-bass and digital/synthetic instrument sounds. The riddim should feel bouncy and energetic.",
     },
     {
         name: "Reggae",
@@ -571,7 +573,7 @@ const MUSIC_TERMS = [
         aliases: ["reggae beat", "reggae music", "dub", "roots reggae", "bob marley", "one drop"],
         definition: "Jamaican music characterized by the 'one drop' rhythm (kick on beat 3, guitar/keys on off-beats), a warm bass-heavy sound, and a laid-back groove. Usually 70-90 BPM.",
         context: "Bob Marley, Peter Tosh, Lee Scratch Perry. Dub is the instrumental, effects-heavy version. One of the most influential genres in history.",
-        beginner_tip: "Recipe: 78 BPM, kick ONLY on beat 3 (the 'one drop'), guitar or keys playing 'chops' on every off-beat (the 'skank'), deep warm bass, and lots of reverb/delay on everything for a dub feel.",
+        beginner_tip: "78 BPM, 4/4. The ONE DROP (16-step grid): Kick: --------x------- (ONLY on beat 3!) | Snare: --------x------- (with kick on beat 3) | HiHat: --x---x---x---x- | Guitar: --x---x---x---x- (the 'skank' — on every off-beat). This is unique: NO kick on beat 1. The kick and snare hit TOGETHER on beat 3 only (step 9). Guitar/keys play short choppy chords on every off-beat — this is called the 'skank' and is THE sound of reggae. Bass is deep, warm, and melodic.",
     },
     {
         name: "Moombahton",
@@ -579,7 +581,7 @@ const MUSIC_TERMS = [
         aliases: ["moombahton", "moombah", "tropical bass", "slow house"],
         definition: "A fusion genre blending House music's structure with Reggaeton/Dancehall rhythms at a slower tempo. Usually 108-112 BPM.",
         context: "Created by Dave Nada in 2009 by slowing down a House track to Reggaeton tempo. Bridges Latin and electronic music.",
-        beginner_tip: "Recipe: 110 BPM, four-on-the-floor kick OR dem bow pattern, tropical percussion (congas, bongos), synth stabs, and a rolling bassline. Think of it as House music on a beach vacation.",
+        beginner_tip: "110 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- (four-on-the-floor) | Snare: ---x--x---x--x-- (dem bow pattern on top) | HiHat: x-x-x-x-x-x-x-x-. It's literally House + Dem Bow combined — the four-on-the-floor kick from House with the syncopated snare pattern from Reggaeton layered on top. Add tropical percussion (congas, bongos, timbales) and synth stabs. Think of it as House music slowed down to a Latin groove.",
     },
     {
         name: "Bachata",
@@ -587,7 +589,7 @@ const MUSIC_TERMS = [
         aliases: ["bachata beat", "bachata music", "dominican bachata", "modern bachata"],
         definition: "A romantic Dominican genre with a distinctive guitar-driven rhythm, bongo patterns, and a syncopated bass feel. Usually 120-140 BPM.",
         context: "Traditional: Romeo Santos, Aventura. Modern Bachata fuses with Pop and R&B. Huge in Latin dance culture.",
-        beginner_tip: "Recipe: 130 BPM, bongo pattern with the classic 'derecho' rhythm, acoustic or nylon guitar arpeggios, bass guitar following the chord roots, and a maracas/guira shaker pattern.",
+        beginner_tip: "130 BPM, 4/4. 16-step grid (bongo 'derecho' pattern): Bongo: x-x-x-x-x-x-x-xx (8th notes with a double tap on beat 4, steps 15-16). The bongo pattern defines Bachata — steady 8th notes with an extra hit at the end of each bar creating a 'ta-ta-ta-ta-ta-ta-ta-TATA' rhythm. Add acoustic guitar arpeggios (fingerpick each chord), bass guitar on beats 1 and 3, and a guira/maracas shaker on all 16th notes.",
     },
     {
         name: "Salsa",
@@ -595,7 +597,7 @@ const MUSIC_TERMS = [
         aliases: ["salsa music", "salsa beat", "salsa production", "latin salsa"],
         definition: "An energetic Latin dance genre with layered percussion (clave, congas, timbales), a strong piano montuno pattern, and a driving horn section. Usually 160-220 BPM.",
         context: "Roots in Cuban Son and NYC Latin communities. Artists: Celia Cruz, Hector Lavoe, Marc Anthony. The clave rhythm is the heartbeat of Salsa.",
-        beginner_tip: "Recipe: 180 BPM, start with the 'son clave' pattern (3-2 or 2-3 rhythm), add conga drum pattern, a piano 'montuno' (repeated rhythmic pattern), and bass following the clave. Everything revolves around the clave.",
+        beginner_tip: "180 BPM, 4/4. The SON CLAVE (two bars, 3-2 pattern across 32 steps): Clave: x--x--x---x-x--- (bar 1: 3 hits) then ---x--x---x-x--- (bar 2: 2 hits). Written as 8th notes across 2 bars: x--x--x-----x-x-x-----x-x---. The clave is the HEARTBEAT — every other instrument locks to it. Add congas playing a 'tumbao' pattern, a piano 'montuno' (a repeating 1-2 bar syncopated riff), and bass on beats 1 and the 'and' of 2. The clave NEVER changes once set.",
     },
 
     // --- Funk, Soul, Disco ---
@@ -605,7 +607,7 @@ const MUSIC_TERMS = [
         aliases: ["funk beat", "funk music", "funky beat", "get funky", "groove music"],
         definition: "A rhythmically complex, groove-driven genre emphasizing syncopated bass, tight drums, and rhythmic guitar. Everything serves the GROOVE. Usually 90-120 BPM.",
         context: "James Brown, Parliament/Funkadelic, Bootsy Collins. Funk is the ancestor of Hip-Hop, House, and modern Pop production.",
-        beginner_tip: "Recipe: 100 BPM, heavily syncopated kick/snare pattern with ghost notes, a BUSY syncopated bassline, rhythmic 'chicken scratch' guitar, and horn stabs. The 'one' (beat 1) is EVERYTHING in Funk.",
+        beginner_tip: "100 BPM, 4/4. 16-step grid: Kick: x--x----x-x----- | Snare: ----x--o----x-o- | HiHat: x-x-x-x-x-x-x-x- | Guitar: -xx--xx--xx--xx-. The 'o' marks are GHOST NOTES — very soft snare hits that fill the space between main hits. The kick is syncopated (NOT on every beat). The guitar plays a choppy 'chicken scratch' rhythm on muted strings. Bass is BUSY — a syncopated 16th note bassline that's almost a melody itself. Beat 1 (the 'ONE') is heavily accented — everything else dances around it.",
     },
     {
         name: "Disco",
@@ -613,7 +615,7 @@ const MUSIC_TERMS = [
         aliases: ["disco beat", "disco music", "nu-disco", "disco production", "daft punk style"],
         definition: "A dance genre built on a four-on-the-floor beat, driving basslines, lush strings, and a euphoric, celebratory energy. Usually 110-130 BPM.",
         context: "1970s origins (Donna Summer, Bee Gees, Chic). Massively influential on House and modern Pop. Nu-Disco revival: Daft Punk, Dua Lipa.",
-        beginner_tip: "Recipe: 120 BPM, four-on-the-floor kick, open hi-hat on off-beats, funky bassline (octave jumps are classic), string pads, and rhythmic guitar. Nile Rodgers' guitar style defines disco.",
+        beginner_tip: "120 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Snare: ----x-------x--- | OpenHat: --x---x---x---x- | ClosedHat: x-x-x-x-x-x-x-x- | Bass: x---x-x-x---x-x-. Same four-on-the-floor as House but with a FUNKY bass pattern — the classic disco bass jumps octaves (root-root-octave pattern, e.g., C2-C2-C3 in 8th notes). Add lush string pads playing sustained chords and a 'Nile Rodgers' style rhythmic guitar playing muted 16th note strums on off-beats.",
     },
 
     // --- Jazz & Blues ---
@@ -623,7 +625,7 @@ const MUSIC_TERMS = [
         aliases: ["jazz", "jazz beat", "jazz chords", "jazz music", "smooth jazz", "jazz hop"],
         definition: "Improvisational music with complex harmony (7th, 9th, 13th chords), swing rhythms, and interplay between instruments. Ranges from smooth to avant-garde.",
         context: "Miles Davis, John Coltrane, Herbie Hancock. Modern jazz-influenced production (Robert Glasper, Tom Misch) bridges jazz with Hip-Hop and R&B.",
-        beginner_tip: "Recipe: 100 BPM with swing, ride cymbal pattern (ding-ding-a-ding), walking bass (moving bass notes), piano comp with 7th/9th chords. Start with ii-V-I progressions — they're the foundation of jazz harmony.",
+        beginner_tip: "100 BPM with SWING (triplet feel). Ride cymbal pattern (not a grid — it's triplet based): 'ding---da-ding---da-ding---da-ding---da' (quarter note, then two triplet 8ths — the classic jazz ride pattern). Kick plays softly on beats 1 and 3; snare with brushes 'feathers' on beats 2 and 4. Bass plays a 'walking' pattern — a new note on every beat moving stepwise through the scale (e.g., C-D-E-F, G-A-B-C). Use ii-V-I chord progressions (Dm7-G7-Cmaj7).",
     },
     {
         name: "Blues",
@@ -631,7 +633,7 @@ const MUSIC_TERMS = [
         aliases: ["blues music", "blues beat", "12-bar blues", "blues production", "blues guitar"],
         definition: "Roots music built on the 12-bar blues chord progression (I-I-I-I-IV-IV-I-I-V-IV-I-V), blue notes, and emotional expression. Usually 70-120 BPM.",
         context: "The foundation of Rock, Jazz, R&B, and Hip-Hop. B.B. King, Muddy Waters, Robert Johnson. The 12-bar blues is one of music's most important structures.",
-        beginner_tip: "Recipe: 80 BPM with shuffle feel, the 12-bar blues progression (4 bars on I, 2 bars on IV, 2 bars on I, 1 bar V, 1 bar IV, 2 bars I), shuffle drums, and guitar with 'blue notes' (flat 3rd, flat 5th, flat 7th).",
+        beginner_tip: "80 BPM with SHUFFLE feel (triplet swing). The shuffle grid uses triplets instead of 16ths — each beat divides into 3: 'da-da-dum, da-da-dum' (accent first and third triplet, skip middle). Kick: beat 1 and 3 | Snare: beat 2 and 4 | HiHat: shuffled triplets (hit-skip-hit-skip-hit-skip...). The 12-bar progression: bars 1-4 on I chord (e.g., E7), bars 5-6 on IV (A7), bars 7-8 back to I (E7), bar 9 on V (B7), bar 10 on IV (A7), bars 11-12 on I (E7). Bend notes on the b3, b5, b7 for 'blue' sound.",
     },
 
     // --- Country & Folk ---
@@ -641,7 +643,7 @@ const MUSIC_TERMS = [
         aliases: ["country music", "country beat", "country production", "modern country", "country pop", "nashville"],
         definition: "American roots music featuring acoustic/electric guitar, fiddle, pedal steel, storytelling lyrics, and a straightforward song structure. Usually 100-140 BPM.",
         context: "From traditional (Johnny Cash, Hank Williams) to modern Pop-Country (Luke Combs, Morgan Wallen, Zach Bryan). Nashville is the industry hub.",
-        beginner_tip: "Recipe: 120 BPM, 'train beat' drums (steady eighth-note hi-hat), acoustic guitar strumming or fingerpicking, bass following root notes, and a clear vocal-forward mix. Keep it honest and simple.",
+        beginner_tip: "120 BPM, 4/4. 16-step grid ('train beat'): Kick: x---x---x---x--- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- (steady 8ths). The 'train beat' is a STEADY, unwavering 8th-note hi-hat — like the rhythm of a train on tracks (no swing, perfectly straight). Kick on every beat, snare on 2 and 4. Over this, add an acoustic guitar strumming a simple progression (G-C-D is classic country). Bass plays root notes on beats 1 and 3. The rhythm should feel DRIVING and steady.",
     },
 
     // --- World & Experimental ---
@@ -651,7 +653,7 @@ const MUSIC_TERMS = [
         aliases: ["kpop", "k-pop", "korean pop", "k pop beat", "bts style", "blackpink style"],
         definition: "Highly polished Korean pop with genre-blending production — a single song might mix EDM drops, rap verses, R&B bridges, and rock choruses. Usually 100-140 BPM.",
         context: "BTS, BLACKPINK, Stray Kids, NewJeans. K-Pop production is known for its density, genre-switching within songs, and pristine mixing.",
-        beginner_tip: "Recipe: varies wildly by section. The key is CONTRAST — a soft verse might suddenly shift into a hard-hitting chorus with completely different production. Don't be afraid to switch genres mid-song.",
+        beginner_tip: "128 BPM, 4/4 — but the drum pattern CHANGES between sections. Verse: Kick: x-------x------- | Snare: --------x------- (half-time, sparse). Chorus: Kick: x---x---x---x--- | Snare: ----x-------x--- (full-time, driving). The key to K-Pop is CONTRAST — different drum patterns, different synths, even different BPM feels between verse/pre-chorus/chorus/bridge. Each section should feel like a surprise. Layer heavily in choruses, strip back in verses.",
     },
     {
         name: "Amapiano",
@@ -659,7 +661,7 @@ const MUSIC_TERMS = [
         aliases: ["amapiano beat", "amapiano production", "south african house", "log drum", "piano house"],
         definition: "A South African genre blending deep house, jazz, and lounge music with distinctive log drum bass, wide pads, and a hypnotic groove. Usually 110-120 BPM.",
         context: "Originated in South African townships. Global breakout via Kabza De Small, DJ Maphorisa, Uncle Waffles. The log drum sound is instantly recognizable.",
-        beginner_tip: "Recipe: 115 BPM, deep four-on-the-floor kick, the signature log drum bassline (a pitched-down wooden drum sound), wide shaker patterns, jazzy Rhodes piano chords, and sparse vocal chops.",
+        beginner_tip: "115 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Shaker: x-x-x-x-x-x-x-x- | LogDrum: x-----x---x----- (the SIGNATURE sound). The log drum is the defining element — it's a deep, pitched, woody bass tone (use a low sine wave with a short pitch envelope dropping from ~200Hz to ~60Hz). It plays a syncopated pattern that's NOT on every beat. Add jazzy Rhodes chords, wide stereo shakers, and sparse vocal chops. Keep it spacious and hypnotic.",
     },
     {
         name: "Grime",
@@ -667,7 +669,7 @@ const MUSIC_TERMS = [
         aliases: ["grime beat", "grime music", "uk grime", "140 bpm", "eskimo dance"],
         definition: "A raw, aggressive UK genre with dark square-wave bass, icy synths, and a driving 140 BPM rhythm. The vocals are fast, punchy, and rhythmic.",
         context: "Born in London (Wiley, Dizzee Rascal, Skepta, Stormzy). Distinct from UK Drill — Grime is more electronic and synth-based.",
-        beginner_tip: "Recipe: 140 BPM, aggressive square-wave or reese bass, icy/metallic synth stabs, tight electronic drums, minimal arrangement. The energy should feel confrontational and urgent.",
+        beginner_tip: "140 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x- | Bass: x-x---x-x-x---x-. Straight four-on-the-floor but with an AGGRESSIVE, digital character. The bass is a square wave or 'reese' bass (two detuned saws) playing a syncopated pattern. Add icy, metallic synth stabs on off-beats. Everything should sound electronic, cold, and confrontational — like a frozen city at night. No warmth, no reverb.",
     },
     {
         name: "Jersey Club",
@@ -675,7 +677,7 @@ const MUSIC_TERMS = [
         aliases: ["jersey club beat", "jersey club", "jersey bounce", "bed squeak beat"],
         definition: "A high-energy, sample-heavy dance genre with rapid-fire kick patterns, chopped vocal samples, and a distinctive bouncy rhythm. Usually 130-145 BPM.",
         context: "Born in Newark, NJ. Characterized by its 'bed squeak' sound, pitched vocal chops, and relentless energy. Artists: DJ Sliink, Nadus. Went viral on TikTok.",
-        beginner_tip: "Recipe: 140 BPM, rapid kick drum patterns (kick-kick-kick-rest), chopped and pitched vocal samples, 'bed squeak' FX, hi-hat rolls, and a bouncy, energetic vibe. It's all about the sample chops.",
+        beginner_tip: "140 BPM, 4/4. 16-step grid: Kick: xxx-xxx-xxx-xxx- (rapid triples!) | Snare: ----x-------x--- | HiHat: x-x-x-x-x-x-x-x-. The signature is the RAPID KICK — three fast kicks then a rest (steps 1-2-3, rest, 5-6-7, rest, etc.). This creates the distinctive 'ba-da-dum' bouncing rhythm. Layer chopped vocal samples pitched to different notes to create a melody. Add the 'bed squeak' sound effect (a short, pitched-up noise hit). Everything is FAST, BOUNCY, and RELENTLESS.",
     },
     {
         name: "Brazilian Funk (Funk Carioca)",
@@ -683,7 +685,7 @@ const MUSIC_TERMS = [
         aliases: ["funk carioca", "baile funk", "brazilian funk", "funk brasil", "anitta style"],
         definition: "A high-energy Brazilian dance genre with booming 808 bass, call-and-response vocals, and the distinctive 'tamborzao' drum pattern. Usually 130-150 BPM.",
         context: "Born in Rio de Janeiro's favelas. Now global via Anitta, MC Kevinho, LUDMILLA. The 'tamborzao' beat is the genre's signature.",
-        beginner_tip: "Recipe: 130 BPM, the 'tamborzao' kick pattern (syncopated, bouncy), heavy sub-bass 808, simple vocal chants, and minimal melodic elements. The drum pattern and bass carry everything.",
+        beginner_tip: "130 BPM, 4/4. TAMBORZAO 16-step grid: Kick: x--x--x--x--x-x- | Snare: ------x-------x- | HiHat: --x---x---x---x-. The 'tamborzao' is a rapid, bouncy kick pattern — the kick hits on steps 1,4,7,10,13,15 creating a galloping 'tum-tum-tum-tum-tum-PA' rhythm. The snare accent on steps 7 and 15 gives it a lopsided bounce. Add a HEAVY 808 sub-bass following the kick, and simple chanted vocals in call-and-response style.",
     },
     {
         name: "Dembow / Dominican Dembow",
@@ -691,7 +693,7 @@ const MUSIC_TERMS = [
         aliases: ["dembow music", "dominican dembow", "el alfa style", "dembow beat"],
         definition: "A fast, percussive Dominican genre evolved from Reggaeton with more aggressive drums and rapid-fire vocals. Usually 115-130 BPM.",
         context: "El Alfa, Tokischa, Rochy RD. Distinct from Puerto Rican Reggaeton — faster, rawer, more percussive. Massive in Latin clubs.",
-        beginner_tip: "Recipe: 120 BPM, aggressive version of the dem bow drum pattern with more percussion layers, heavy bass, minimal melody, and high-energy vocal delivery. Think Reggaeton's wild cousin.",
+        beginner_tip: "120 BPM, 4/4. 16-step grid: Kick: x--x--x---x--x-- | Snare: ---x--x---x--x-x | HiHat: xxxxxxxxxxxxxxxx (all 16ths) | Perc: x-x-x-x-x-x-x-x-. Same dem bow foundation as Reggaeton but FASTER, LOUDER, more percussion layers. Add constant 16th-note hi-hats for intensity, layer extra percussion (cowbell, woodblock) on 8th notes, and push the 808 bass hard. The snare pattern is denser than Reggaeton — more hits, more aggressive. Vocals are rapid-fire and high-energy.",
     },
     {
         name: "Afro House",
@@ -699,7 +701,7 @@ const MUSIC_TERMS = [
         aliases: ["afro house beat", "afro house production", "tribal house", "black coffee style"],
         definition: "A fusion of House music with African percussion, polyrhythmic drums, and organic textures. Deep, spiritual, and groove-heavy. Usually 118-125 BPM.",
         context: "Black Coffee, Keinemusik, Rampa, Da Capo. Bridges African musical traditions with electronic dance music. Huge in Ibiza and global club scenes.",
-        beginner_tip: "Recipe: 122 BPM, four-on-the-floor kick, layered African percussion (djembe, shakers, congas), deep bassline, organic textures (vocal chants, kalimba), and hypnotic repetition.",
+        beginner_tip: "122 BPM, 4/4. 16-step grid: Kick: x---x---x---x--- | Clap: ----x-------x--- | Shaker: xxxxxxxxxxxxxxxx | Djembe: --x-x-----x-x--- | Conga: x-----x-x-----x-. Four-on-the-floor kick as the foundation, then layer POLYRHYTHMIC African percussion on top — the djembe and conga play DIFFERENT rhythms that interlock. The shaker runs constant 16ths as the pulse. Add a deep sub-bassline, organic textures (kalimba, vocal chants), and hypnotic repetition. The percussion layers should create a complex, interlocking groove.",
     },
 
     // ===================================================================
