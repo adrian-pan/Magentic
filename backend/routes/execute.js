@@ -66,4 +66,21 @@ router.get('/analyze', async (req, res) => {
     }
 });
 
+// GET /api/reaper/analyze/instruments — list installed instruments
+router.get('/analyze/instruments', async (req, res) => {
+    try {
+        const response = await fetch(`${BRIDGE_URL}/analyze/instruments`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        if (error.cause?.code === 'ECONNREFUSED') {
+            return res.status(503).json({
+                success: false,
+                error: 'Bridge not running. Start it with: cd bridge && python main.py',
+            });
+        }
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;
