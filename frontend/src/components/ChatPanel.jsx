@@ -22,6 +22,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
 
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
+    const abortControllerRef = useRef(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -78,9 +79,25 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
         }
     };
 
+    const stopGeneration = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsLoading(false);
+    };
+
     const sendMessage = async (text) => {
         const content = text || input.trim();
         if (!content || isLoading) return;
+
+        // Cancel any in-flight request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         setError(null);
         setInput('');
@@ -101,6 +118,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     includeProjectState: reaperStatus?.reaper_connected || false,
                     modelSystem,
                 }),
+                signal: controller.signal,
             });
 
             const data = await res.json();
@@ -117,8 +135,13 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                 setTimeout(() => onAnalyze(), 1000);
             }
         } catch (err) {
+            if (err.name === 'AbortError') {
+                // User cancelled — not an error, just stop the loading state
+                return;
+            }
             setError(err.message);
         } finally {
+            abortControllerRef.current = null;
             setIsLoading(false);
         }
     };
@@ -309,13 +332,22 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                             ))}
                         </div>
                     )}
-                    <button
-                        className="chat-send-btn"
-                        onClick={() => sendMessage()}
-                        disabled={!input.trim() || isLoading}
-                    >
-                        [TRANSMIT]
-                    </button>
+                    {isLoading ? (
+                        <button
+                            className="chat-stop-btn"
+                            onClick={stopGeneration}
+                        >
+                            [STOP]
+                        </button>
+                    ) : (
+                        <button
+                            className="chat-send-btn"
+                            onClick={() => sendMessage()}
+                            disabled={!input.trim()}
+                        >
+                            [TRANSMIT]
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
