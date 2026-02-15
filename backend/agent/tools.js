@@ -10,6 +10,7 @@
 const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:5001';
 const API_BASE = process.env.API_URL || `http://localhost:${process.env.PORT || 3001}`;
 const { listBucketFiles, getPublicUrl, getSupabase } = require('../lib/supabase');
+const { searchMusicTerms } = require('../lib/musicTheory');
 
 // ---------------------------------------------------------------------------
 // Low-level bridge helpers
@@ -484,6 +485,19 @@ async function transcribeToMidi({ file_url }) {
     }
 }
 
+async function lookupMusicTerm({ query }) {
+    const results = searchMusicTerms(query);
+    if (results.length === 0) {
+        return { success: true, output: `No exact terminology found for "${query}". Explain the concept simply based on general knowledge.` };
+    }
+    const best = results[0];
+    return {
+        success: true,
+        output: `Found term: **${best.name}**\nDefinition: ${best.definition}\nContext: ${best.context}\n\n(Use this to explain to the user BEFORE generating code)`,
+        term: best
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Local File Import Tool (requires local path from context)
 // ---------------------------------------------------------------------------
@@ -553,6 +567,7 @@ const TOOL_DISPATCH = {
     transcribe_to_midi: transcribeToMidi,
     transcribe_to_midi: transcribeToMidi,
     insert_media_file: insertMediaFile,
+    lookup_music_term: lookupMusicTerm,
 };
 
 // ---------------------------------------------------------------------------
@@ -796,6 +811,20 @@ const TOOL_SCHEMAS = [
                     item_index: { type: 'integer', description: 'Item index on the track (0-based)' },
                 },
                 required: ['track_index', 'item_index'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'lookup_music_term',
+            description: 'Look up a music production term or concept to explain it to the user. Use this when the user describes a pattern (e.g. "kick every measure") to find the technical name (e.g. "Four-on-the-Floor").',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'The description or term to look up (e.g. "kick every beat", "trap hats")' },
+                },
+                required: ['query'],
             },
         },
     },
