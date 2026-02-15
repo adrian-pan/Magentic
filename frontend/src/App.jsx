@@ -43,7 +43,7 @@ export default function App() {
       <header className="app-header">
         <div className="app-logo">
           <Logo size={28} />
-          <span className="app-logo-text">MAGENTIC_OS</span>
+          <span className="app-logo-text">MAGENTIC</span>
         </div>
         <div className="app-status">
           <span className="status-text">[SYSTEM: ONLINE]</span>
@@ -63,7 +63,7 @@ export default function App() {
           {/* Project State Panel */}
           <div className="project-panel">
             <div className="panel-header">
-              <span className="panel-title">PRJ_STATE</span>
+              <span className="panel-title">PROJECT</span>
               <button
                 className="analyze-btn"
                 onClick={analyzeProject}

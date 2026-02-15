@@ -189,7 +189,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
     return (
         <div className="chat-panel panel">
             <div className="panel-header">
-                <span className="panel-title">MAGENTIC_CORE</span>
+                <span className="panel-title">MAGENTIC</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {reaperStatus && (
                         <div className={`reaper-status ${reaperStatus.reaper_connected ? 'connected' : 'disconnected'}`}>
@@ -197,9 +197,6 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                                 ? `[LINK: ACTIVE] v${reaperStatus.reaper_version}`
                                 : '[LINK: OFFLINE]'}
                         </div>
-                    )}
-                    {messages.length > 0 && (
-                        <span className="panel-badge">MSG:{messages.length}</span>
                     )}
                 </div>
             </div>
@@ -212,7 +209,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         </div>
                         <h2 className="welcome-title">SYSTEM_READY</h2>
                         <p className="welcome-subtitle">
-                            MAGENTIC_OS v1.0 INITIALIZED.<br />
+                            MAGENTIC INITIALIZED.<br />
                             AWAITING INPUT FOR AUDIO SEQUENCING OPERATIONS.
                         </p>
                         <div className="welcome-chips">
@@ -231,9 +228,11 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     <>
                         {messages.map((msg, i) => (
                             <div key={i} className={`message ${msg.role}`}>
-                                <div className="message-avatar">
-                                    {msg.role === 'user' ? 'USR' : 'SYS'}
-                                </div>
+                                {msg.role !== 'user' && (
+                                    <div className="message-avatar">
+                                        <Logo size={40} />
+                                    </div>
+                                )}
                                 <div className="message-bubble">
                                     {renderContent(msg.content, i)}
                                 </div>
@@ -241,7 +240,9 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         ))}
                         {isLoading && (
                             <div className="message assistant">
-                                <div className="message-avatar">SYS</div>
+                                <div className="message-avatar">
+                                    <Logo size={40} />
+                                </div>
                                 <div className="message-bubble">
                                     <div className="typing-indicator">
                                         <div className="typing-dot" />
