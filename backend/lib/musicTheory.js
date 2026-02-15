@@ -793,6 +793,121 @@ const MUSIC_TERMS = [
         context: "Professional mixes use automation extensively. Even subtle volume rides on vocals make a huge difference.",
         beginner_tip: "Start with volume automation: make the verse quieter and the chorus louder. Then try automating a filter cutoff to open up during the chorus. Automation is what turns a loop into a song.",
     },
+    // ===================================================================
+    // EMOTIONS & MOODS — how to create specific feelings
+    // ===================================================================
+    {
+        name: "Sad / Melancholic",
+        category: "emotion",
+        aliases: ["sad beat", "sad music", "emotional beat", "depressing music", "how to make sad music", "melancholy"],
+        definition: "Music that evokes sadness or longing. Key characteristics: Minor keys, slow tempos, and intimate instrumentation.",
+        context: "Common in Ballads, Lo-Fi, and Emo Rap. Think Adele, juice WRLD, XXXTENTACION.",
+        beginner_tip: "Recipe: Use a Minor scale (Natural Minor). Slow tempo (60-80 BPM). Use piano or strings. Drench everything in reverb. Use 'closed' chord voicings in the lower midrange for a somber feel.",
+    },
+    {
+        name: "Hype / Aggressive",
+        category: "emotion",
+        aliases: ["hype beat", "aggressive music", "angry beat", "hard beat", "gym music", "workout music"],
+        definition: "High-energy music meant to pump you up. Uses dissonance, loud drums, and distortion.",
+        context: "Trap, Drill, Heavy Metal, Dubstep. Music for working out or moshing.",
+        beginner_tip: "Recipe: Use the PHRYGIAN mode (minor scale with a flat 2nd). Fast tempo (140+ BPM). Distorted 808s. Use semitone intervals (notes right next to each other) to create tension and dissonance.",
+    },
+    {
+        name: "Happy / Uplifting",
+        category: "emotion",
+        aliases: ["happy beat", "uplifting music", "positive vibes", "good vibes", "cheerful music"],
+        definition: "Music that feels bright and optimistic. Major keys and fast/bouncy rhythms.",
+        context: "Pop, House, Future Bass. Katy Perry, Avicii.",
+        beginner_tip: "Recipe: Use a Major scale or Lydian mode. Fast or bouncy tempo (120+ BPM). Bright sounds (supersaws, bells, acoustic guitar). Keep chords simple (I-IV-V). Avoid too many minor chords.",
+    },
+    {
+        name: "Chill / Relaxed",
+        category: "emotion",
+        aliases: ["chill beat", "relaxing music", "vibe music", "study music", "background music"],
+        definition: "Low-energy music for relaxing. Smooth textures, slow tempos, and lack of harsh transients.",
+        context: "Lo-Fi, Ambient, R&B. Music to study or sleep to.",
+        beginner_tip: "Recipe: Moderate tempo (80-90 BPM). Use 'extended' chords (Major 7th, Minor 9th) for a jazzy feel. Filter out the high frequencies (low-pass filter) on drums and synths to make them sound soft and warm.",
+    },
+    {
+        name: "Dark / Mysterious",
+        category: "emotion",
+        aliases: ["dark beat", "mysterious music", "creepy music", "horror music", "suspense"],
+        definition: "Music that creates tension and unease. Uses dissonance, chromaticism, and sparse arrangement.",
+        context: "Drill, Techno, Cinematic scores.",
+        beginner_tip: "Recipe: Minor scale or Locrian mode. Use lots of space/silence. unexpected sounds. Use a heavy, detuned 808. Pitch-shift samples down. Dissonant intervals like the tritone (6 semitones) create instant evil vibes.",
+    },
+
+    // ===================================================================
+    // SPECIFIC GENRE RECIPES — Detailed patterns
+    // ===================================================================
+    {
+        name: "Jersey Club Recipe",
+        category: "genre_recipe",
+        aliases: ["how to make jersey club", "jersey club pattern", "jersey kick pattern"],
+        definition: "The 'heartbeat' of Jersey Club. A specific 5-hit kick pattern in one bar.",
+        context: "The defining element of the genre. If you don't use this kick pattern, it's not Jersey Club.",
+        beginner_tip: "Kick Pattern (1 Bar): Beat 1, Beat 2, Beat 3, Beat 4, and the 'and' of 4. \nRhythm: Boom - Boom - Boom - Boom-Boom. \nBPM: 135-145. \nAdd 'bed squeak' samples on the off-beats and triplet chopped vocals.",
+    },
+    {
+        name: "UK Drill Recipe",
+        category: "genre_recipe",
+        aliases: ["how to make drill", "drill pattern", "drill hi hats", "drill 808"],
+        definition: "Detailed Drill drum production. It's all about the syncopation and slides.",
+        context: "Pop Smoke, Central Cee type beats.",
+        beginner_tip: "1. Tempo: 140-145 BPM.\n2. Snare: Place on beat 3 and beat 8 (in double-time) — creating a 'delayed' feel.\n3. Hi-Hats: Use triplet grids (1/12 or 1/24). Randomize velocity.\n4. 808: MUST SLIDE. Use portamento to slide the bass pitch up an octave usually at the end of a bar.",
+    },
+    {
+        name: "Modern Trap Recipe",
+        category: "genre_recipe",
+        aliases: ["how to make trap", "trap pattern", "rolling hi hats"],
+        definition: "The distinct Atlanta Trap sound recipe.",
+        context: "Future, Metro Boomin.",
+        beginner_tip: "1. Tempo: 130-170 BPM.\n2. Snare: Hard clip on beat 3 of every measure.\n3. Hi-Hats: 2-step (1/8th notes) as base, then sprinkle in 1/32 note rolls.\n4. Kick/808: Keep them simple but LOUD. Sidechain isn't always needed if the samples are short and punchy.",
+    },
+
+    // ===================================================================
+    // ADVANCED THEORY — Modes & Voicings
+    // ===================================================================
+    {
+        name: "Phrygian Mode",
+        category: "theory",
+        aliases: ["phrygian", "trap scale", "evil scale", "spanish scale", "exotic scale"],
+        definition: "A musical mode that sounds dark, aggressive, and exotic. It's the natural minor scale with a FLAT 2nd note.",
+        context: "Used constantly in Trap, Drill, and Metal for that 'menacing' sound.",
+        beginner_tip: "Take a natural minor scale (e.g., E Minor: E F# G A B C D) and flatten the second note (F# becomes F). That half-step movement from E to F creates instant tension and evil vibes.",
+    },
+    {
+        name: "Lydian Mode",
+        category: "theory",
+        aliases: ["lydian", "dreamy scale", "movie scale", "simpsons scale", "sci-fi scale"],
+        definition: "A major scale with a SHARP 4th note. It sounds floaty, magical, and hopeful.",
+        context: "Film scores (E.T., Back to the Future) and dreamy Pop/Ambient music.",
+        beginner_tip: "Take a C Major scale (all white keys) and sharpen the 4th note (F becomes F#). Try playing a Major II chord (D Major in key of C) to really bring out that Lydian sound.",
+    },
+    {
+        name: "Dorian Mode",
+        category: "theory",
+        aliases: ["dorian", "funky minor", "house scale", "santana scale"],
+        definition: "A minor scale with a NATURAL 6th note (instead of flat 6). Sounds cooler, funkier, and less 'sad' than normal minor.",
+        context: "Daft Punk 'Get Lucky', Santana 'Oye Como Va', Deep House, Funk.",
+        beginner_tip: "Play D minor on all white keys (D to D). That's Dorian. It has a 'bright minor' sound that is great for groovy basslines.",
+    },
+    {
+        name: "Shell Chords",
+        category: "theory",
+        aliases: ["jazz chords", "simple chords", "shells", "guide tones"],
+        definition: "Playing only the essential notes of a chord: The Root, the 3rd, and the 7th. You leave out the 5th.",
+        context: "Essential for Jazz, Neo-Soul, and Lofi Hip-Hop. Makes complex chords sound cleaner.",
+        beginner_tip: "If your 7th chords sound muddy, delete the 5th (the middle note). Just play Root-3rd-7th. It instantly sounds more professional and jazzy.",
+    },
+    {
+        name: "Chord Extensions",
+        category: "theory",
+        aliases: ["7ths", "9ths", "11ths", "fancy chords", "extensions", "color notes"],
+        definition: "Adding extra notes on top of a basic triad (1-3-5) to add color and emotion. 7ths are jazzy, 9ths are dreamy.",
+        context: "R&B, Jazz, Lofi, Neo-Soul.",
+        beginner_tip: "To make any chord sound 'expensive', add the 7th node (count 7 notes up from the root in the scale) or the 9th. C Major becomes C Major 9 (C-E-G-B-D).",
+    },
 ];
 
 // Stop words to ignore when tokenizing queries
