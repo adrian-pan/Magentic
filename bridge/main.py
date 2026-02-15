@@ -12,11 +12,10 @@ import ssl
 import tempfile
 import urllib.request
 from contextlib import redirect_stdout, redirect_stderr
+from typing import Optional
 
 import reapy
 import threading
-
-from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -232,7 +231,7 @@ def analyze_instruments():
 
 @app.post("/download")
 def download_file(request: DownloadRequest):
-    """Download a file from URL to a temp path REAPER can access. Returns local path."""
+    """Download a file from URL to a temp path REAPER can access."""
     try:
         filename = request.filename or "sample"
         if "." not in filename and request.url:
@@ -243,7 +242,6 @@ def download_file(request: DownloadRequest):
         suffix = os.path.splitext(filename)[1] or ".mp3"
         fd, path = tempfile.mkstemp(suffix=suffix)
         os.close(fd)
-        # macOS Python often lacks system certs; use certifi if available
         try:
             import certifi
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
@@ -280,7 +278,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("BRIDGE_PORT", 5001))
     print(f"\n🧲 Magentic Bridge starting on http://localhost:{port}")
     print("   POST /execute  — Run reapy code in REAPER")
-    print("   POST /download — Download URL to temp path for REAPER")
     print("   GET  /analyze  — Read full REAPER project state")
     print("   GET  /analyze/instruments — List installed instruments")
     print("   GET  /status   — Check REAPER connection\n")

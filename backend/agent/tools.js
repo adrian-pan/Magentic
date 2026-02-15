@@ -8,6 +8,8 @@
  */
 
 const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:5001';
+const API_BASE = process.env.API_URL || `http://localhost:${process.env.PORT || 3001}`;
+const { listBucketFiles, getPublicUrl, getSupabase } = require('../lib/supabase');
 
 // ---------------------------------------------------------------------------
 // Low-level bridge helpers
@@ -159,86 +161,6 @@ else:
     `, 90000);
 }
 
-async function insertMediaToTrack({ file_url, track_index = -1, track_name = 'Audio', position = 0 }) {
-    const dlRes = await fetch(`${BRIDGE_URL}/download`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            url: file_url,
-            filename: file_url.split('/').pop().split('?')[0],
-        }),
-    });
-    const dl = await dlRes.json();
-    if (!dl.success || !dl.path) {
-        return { success: false, error: dl.error || 'Download failed' };
-    }
-
-    const trackIdx = track_index;
-    const name = track_name;
-    const pos = position;
-    return runCode(`
-import reapy
-RPR = reapy.reascript_api
-path = ${JSON.stringify(dl.path)}
-track_name = ${JSON.stringify(name)}
-pos = ${pos}
-
-n = RPR.CountTracks(0)
-idx = ${trackIdx} if ${trackIdx} >= 0 else n
-if idx >= n:
-    RPR.InsertTrackAtIndex(n, True)
-    idx = n
-track = RPR.GetTrack(0, idx)
-RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
-
-for i in range(RPR.CountTracks(0)):
-    RPR.SetTrackSelected(RPR.GetTrack(0, i), False)
-RPR.SetTrackSelected(track, True)
-RPR.SetEditCurPos(pos, True, False)
-RPR.InsertMedia(path, 0)
-print("Inserted audio as media item on track", idx, "(" + track_name + ") at", pos, "s")
-`, 90000);
-}
-
-async function addSampleToTrack({ file_url, track_index = -1, track_name = 'Sample' }) {
-    const dlRes = await fetch(`${BRIDGE_URL}/download`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            url: file_url,
-            filename: file_url.split('/').pop().split('?')[0],
-        }),
-    });
-    const dl = await dlRes.json();
-    if (!dl.success || !dl.path) {
-        return { success: false, error: dl.error || 'Download failed' };
-    }
-
-    const trackIdx = track_index;
-    const name = track_name;
-    return runCode(`
-import reapy
-RPR = reapy.reascript_api
-path = ${JSON.stringify(dl.path)}
-track_name = ${JSON.stringify(name)}
-
-n = RPR.CountTracks(0)
-idx = ${trackIdx} if ${trackIdx} >= 0 else n
-if idx >= n:
-    RPR.InsertTrackAtIndex(n, True)
-    idx = n
-track = RPR.GetTrack(0, idx)
-RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
-
-fx_idx = RPR.TrackFX_AddByName(track, "ReaSamplomatic5000", False, -1)
-if fx_idx < 0:
-    print("ERROR: ReaSamplomatic5000 not found")
-else:
-    RPR.TrackFX_SetNamedConfigParm(track, fx_idx, "FILE0", path)
-    print("Added ReaSamplomatic5000 with sample to track", idx, "(" + track_name + ")")
-`, 90000);
-}
-
 async function setFxParam({ track_index, fx_index, param_name, value }) {
     return runCode(`
 import reapy
@@ -322,6 +244,161 @@ print(f"Cursor moved to ${position}s")
     `);
 }
 
+async function insertMediaToTrack({ file_url, track_index = -1, track_name = 'Audio', position = 0 }) {
+    const dlRes = await fetch(`${BRIDGE_URL}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: file_url,
+            filename: file_url.split('/').pop().split('?')[0],
+        }),
+    });
+    const dl = await dlRes.json();
+    if (!dl.success || !dl.path) {
+        return { success: false, error: dl.error || 'Download failed' };
+    }
+
+    const trackIdx = track_index;
+    const name = track_name;
+    const pos = position;
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+path = ${JSON.stringify(dl.path)}
+track_name = ${JSON.stringify(name)}
+pos = ${pos}
+
+n = RPR.CountTracks(0)
+idx = ${trackIdx} if ${trackIdx} >= 0 else n
+if idx >= n:
+    RPR.InsertTrackAtIndex(n, True)
+    idx = n
+track = RPR.GetTrack(0, idx)
+RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
+
+# Use AddMediaItemToTrack + PCM_Source for explicit track placement (InsertMedia can be unreliable)
+src = RPR.PCM_Source_CreateFromFile(path)
+if src:
+    item = RPR.AddMediaItemToTrack(track)
+    lengthResult = RPR.GetMediaSourceLength(src, False)
+    length = lengthResult[0] if isinstance(lengthResult, (list, tuple)) else lengthResult
+    RPR.SetMediaItemPosition(item, pos, False)
+    RPR.SetMediaItemLength(item, length, False)
+    take = RPR.AddTakeToMediaItem(item)
+    RPR.SetMediaItemTake_Source(take, src)
+    RPR.SetActiveTake(take)
+    print("Inserted audio as media item on track", idx, "(" + track_name + ") at", pos, "s")
+else:
+    # Fallback: select track and use InsertMedia
+    for i in range(RPR.CountTracks(0)):
+        RPR.SetTrackSelected(RPR.GetTrack(0, i), False)
+    RPR.SetTrackSelected(track, True)
+    RPR.SetEditCurPos(pos, True, False)
+    RPR.InsertMedia(path, 0)
+    print("Inserted audio on track", idx, "(fallback)")
+`, 90000);
+}
+
+// ---------------------------------------------------------------------------
+// RunPod / ML function tools (call backend API → RunPod when configured)
+// ---------------------------------------------------------------------------
+
+async function separateStems({ file_url }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 300000);
+    try {
+        const res = await fetch(`${API_BASE}/api/functions/separate-stems`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: file_url }),
+            signal: controller.signal,
+        });
+        const data = await res.json();
+        clearTimeout(timer);
+        if (!res.ok) {
+            return { success: false, error: data.error || `HTTP ${res.status}` };
+        }
+        if (data.error) {
+            return { success: false, error: data.error };
+        }
+        const stems = data.stems || {};
+        const names = Object.keys(stems);
+        return {
+            success: true,
+            output: `Separated into ${names.length} stems: ${names.join(', ')}. URLs: ${JSON.stringify(stems)}`,
+            stems,
+        };
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') {
+            return { success: false, error: 'Stem separation timed out (5 min). Try a shorter file.' };
+        }
+        return { success: false, error: err.message };
+    }
+}
+
+/** List stems for a song from Supabase. Storage path: {songName}/{stemName}.mp3 */
+async function listStemsForSong({ song_name }) {
+    try {
+        const sb = getSupabase();
+        if (!sb) {
+            return { success: false, error: 'Supabase not configured.' };
+        }
+        const safeName = (song_name || '').replace(/[^a-zA-Z0-9_-]/g, '_').trim();
+        if (!safeName) {
+            return { success: false, error: 'song_name is required (e.g. Face_Down_Ass_Up)' };
+        }
+        const files = await listBucketFiles(safeName);
+        const stems = {};
+        for (const f of files) {
+            const stemName = f.name.replace(/\.[^/.]+$/, '');
+            stems[stemName] = getPublicUrl(f.path);
+        }
+        const names = Object.keys(stems);
+        return {
+            success: true,
+            stems,
+            output: names.length
+                ? `Found ${names.length} stems in ${safeName}/: ${names.join(', ')}. URLs: ${JSON.stringify(stems)}`
+                : `No stems found for "${safeName}". Stems are stored at {songName}/{stemName}.mp3 (e.g. ${safeName}/drums.mp3). Run separate_stems first.`,
+        };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+async function transcribeToMidi({ file_url }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    try {
+        const res = await fetch(`${API_BASE}/api/functions/transcribe-to-midi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: file_url }),
+            signal: controller.signal,
+        });
+        const data = await res.json();
+        clearTimeout(timer);
+        if (!res.ok) {
+            return { success: false, error: data.error || `HTTP ${res.status}` };
+        }
+        if (data.error) {
+            return { success: false, error: data.error };
+        }
+        return {
+            success: true,
+            output: `Transcribed to MIDI. URL: ${data.midiUrl}`,
+            midiUrl: data.midiUrl,
+        };
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') {
+            return { success: false, error: 'Transcription timed out (2 min).' };
+        }
+        return { success: false, error: err.message };
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tool dispatch map
 // ---------------------------------------------------------------------------
@@ -337,8 +414,6 @@ const TOOL_DISPATCH = {
     create_midi_item: createMidiItem,
     add_midi_notes: addMidiNotes,
     add_fx: addFx,
-    add_sample_to_track: addSampleToTrack,
-    insert_media_to_track: insertMediaToTrack,
     set_fx_param: setFxParam,
     list_fx_params: listFxParams,
     load_fx_preset: loadFxPreset,
@@ -346,6 +421,11 @@ const TOOL_DISPATCH = {
     play,
     stop,
     set_cursor_position: setCursorPosition,
+    insert_media_to_track: insertMediaToTrack,
+    separate_stems: separateStems,
+    generate_stems: separateStems,
+    list_stems_for_song: listStemsForSong,
+    transcribe_to_midi: transcribeToMidi,
 };
 
 // ---------------------------------------------------------------------------
@@ -515,39 +595,6 @@ const TOOL_SCHEMAS = [
     {
         type: 'function',
         function: {
-            name: 'add_sample_to_track',
-            description: 'Add an imported audio file as a one-shot sample in ReaSamplomatic5000 on a track. Use when the user wants to add "the imported sound" as an instrument/sampler. Requires file_url from context files.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
-                    track_index: { type: 'integer', description: 'Track index (0-based). -1 = append new track', default: -1 },
-                    track_name: { type: 'string', description: 'Name for the track if creating new', default: 'Sample' },
-                },
-                required: ['file_url'],
-            },
-        },
-    },
-    {
-        type: 'function',
-        function: {
-            name: 'insert_media_to_track',
-            description: 'Insert an imported audio file as a media item on the timeline (visible waveform block). Use when the user wants the audio "on the grid" or "in the pattern" as a visible clip they can move, trim, edit. Requires file_url from context files.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
-                    track_index: { type: 'integer', description: 'Track index (0-based). -1 = append new track', default: -1 },
-                    track_name: { type: 'string', description: 'Name for the track if creating new', default: 'Audio' },
-                    position: { type: 'number', description: 'Start position in seconds on timeline', default: 0 },
-                },
-                required: ['file_url'],
-            },
-        },
-    },
-    {
-        type: 'function',
-        function: {
             name: 'set_fx_param',
             description: 'Set a parameter on a track FX plugin using substring name matching (normalized 0.0–1.0). Use list_fx_params first to find the right name.',
             parameters: {
@@ -637,6 +684,79 @@ const TOOL_SCHEMAS = [
                     position: { type: 'number', description: 'Position in seconds' },
                 },
                 required: ['position'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'insert_media_to_track',
+            description: 'Insert an audio file as a media item on the timeline (visible waveform). Use for stems, imported files, etc. Creates a track if track_index is -1.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the audio file' },
+                    track_index: { type: 'integer', description: 'Track index (0-based). -1 = append new track', default: -1 },
+                    track_name: { type: 'string', description: 'Name for the track if creating new', default: 'Audio' },
+                    position: { type: 'number', description: 'Start position in seconds on timeline', default: 0 },
+                },
+                required: ['file_url'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'separate_stems',
+            description: 'Separate an audio file into stems (drums, bass, vocals, other) using AI. Loads stems to Supabase at {songName}/{stemName}.mp3. Returns URLs. Use when user asks to "create stems" or "split stems".',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
+                },
+                required: ['file_url'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'generate_stems',
+            description: 'Alias for separate_stems. Create stems and load to Supabase at {songName}/{stemName}.mp3.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
+                },
+                required: ['file_url'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'list_stems_for_song',
+            description: 'Retrieve stem URLs from Supabase for a song. Stems stored at {songName}/{stemName}.mp3. Use when user asks to "import stems from X" and stems were already generated.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    song_name: { type: 'string', description: 'Song/folder name (e.g. Face_Down_Ass_Up)' },
+                },
+                required: ['song_name'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'transcribe_to_midi',
+            description: 'Transcribe an audio file to MIDI using AI (Basic Pitch). Uses RunPod GPU when configured. Requires file_url from context files. Returns URL to MIDI file in Supabase.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the audio file (from context files)' },
+                },
+                required: ['file_url'],
             },
         },
     },
