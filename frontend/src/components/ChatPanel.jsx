@@ -18,6 +18,8 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
     const [reaperStatus, setReaperStatus] = useState(null);
     const [executingBlocks, setExecutingBlocks] = useState({});
     const [executeResults, setExecuteResults] = useState({});
+    const [modelSystem, setModelSystem] = useState('openai'); // 'openai' or 'anthropic'
+
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
 
@@ -97,6 +99,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     messages: updatedMessages,
                     contextFiles,
                     includeProjectState: reaperStatus?.reaper_connected || false,
+                    modelSystem,
                 }),
             });
 
@@ -191,6 +194,25 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
             <div className="panel-header">
                 <span className="panel-title">MAGENTIC</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <select
+                        className="model-select"
+                        value={modelSystem}
+                        onChange={(e) => setModelSystem(e.target.value)}
+                        style={{
+                            background: '#1a1a1a',
+                            color: '#00ff9d',
+                            border: '1px solid #333',
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            fontSize: '0.8rem',
+                            fontFamily: 'monospace',
+                            outline: 'none',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <option value="openai">GPT-4o</option>
+                        <option value="anthropic">CLAUDE 3.7</option>
+                    </select>
                     {reaperStatus && (
                         <div className={`reaper-status ${reaperStatus.reaper_connected ? 'connected' : 'disconnected'}`}>
                             {reaperStatus.reaper_connected

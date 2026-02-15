@@ -24,17 +24,16 @@ async function getProjectState() {
 const MAX_TOOL_ROUNDS = 10;
 
 // POST /api/chat
+// POST /api/chat
 router.post('/', async (req, res) => {
     try {
-        const { messages, contextFiles, includeProjectState } = req.body;
+        const { messages, contextFiles, includeProjectState, modelSystem } = req.body;
 
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({ error: 'messages array is required' });
         }
 
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-        // Build system message with optional context
+        // --- Build system prompt ---
         let contextBlock = '';
 
         if (includeProjectState) {
@@ -51,7 +50,6 @@ router.post('/', async (req, res) => {
         if (contextFiles && contextFiles.length > 0) {
             contextBlock += '\n\n## Currently Loaded Context Files\n';
             contextFiles.forEach((file) => {
-                // Try to resolve the full file record from store to get the local path
                 const storeRecord = file.id ? fileStore.getById(file.id) : null;
                 const localPath = storeRecord ? storeRecord.storagePath : null;
 
@@ -66,12 +64,39 @@ router.post('/', async (req, res) => {
             });
         }
 
+        const fullSystemPrompt = SYSTEM_PROMPT + contextBlock;
+
+        // --- Handle Anthropic (Claude) ---
+        if (modelSystem === 'anthropic') {
+            const { runClaudeConversation } = require('../agent/anthropicClient');
+            try {
+                // Anthropic SDK handles the loop internally in our helper
+                // We pass system prompt separately as required by Anthropic API
+                // Filter out system messages from 'messages' array for Anthropic
+                const userMessages = messages.filter(m => m.role !== 'system');
+
+                const result = await runClaudeConversation(userMessages, fullSystemPrompt, TOOL_SCHEMAS);
+
+                return res.json({
+                    message: {
+                        role: 'assistant',
+                        content: result.content
+                    },
+                    toolResults: result.toolResults
+                });
+            } catch (claudeErr) {
+                console.error('Claude API Error:', claudeErr);
+                return res.status(500).json({ error: `Claude API Error: ${claudeErr.message}` });
+            }
+        }
+
+        // --- Handle OpenAI (Default) ---
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const systemMessage = {
             role: 'system',
-            content: SYSTEM_PROMPT + contextBlock,
+            content: fullSystemPrompt,
         };
 
-        // Build conversation with function-calling tools
         const conversationMessages = [systemMessage, ...messages];
         const toolResults = [];
         let rounds = 0;
@@ -90,10 +115,8 @@ router.post('/', async (req, res) => {
             const choice = completion.choices[0];
             const assistantMsg = choice.message;
 
-            // Append assistant message to conversation
             conversationMessages.push(assistantMsg);
 
-            // If no tool calls, we're done — this is the final text response
             if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
                 return res.json({
                     message: {
@@ -105,7 +128,6 @@ router.post('/', async (req, res) => {
                 });
             }
 
-            // Execute each tool call
             for (const call of assistantMsg.tool_calls) {
                 const fn = TOOL_DISPATCH[call.function.name];
                 let result;
@@ -127,7 +149,6 @@ router.post('/', async (req, res) => {
                     result,
                 });
 
-                // Feed result back to the conversation
                 conversationMessages.push({
                     role: 'tool',
                     tool_call_id: call.id,
@@ -136,22 +157,20 @@ router.post('/', async (req, res) => {
             }
         }
 
-        // If we hit the limit, return whatever we have
         const lastMsg = conversationMessages[conversationMessages.length - 1];
         res.json({
             message: {
                 role: 'assistant',
-                content: lastMsg.content || 'I completed the requested actions. Check REAPER to see the results.',
+                content: lastMsg.content || 'I completed the requested actions.',
             },
             toolResults,
         });
+
     } catch (error) {
         console.error('Chat error:', error.message);
-
         if (error.status === 401) {
-            return res.status(401).json({ error: 'Invalid OpenAI API key. Check your .env file.' });
+            return res.status(401).json({ error: 'Invalid API key. Check your .env file.' });
         }
-
         res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });
