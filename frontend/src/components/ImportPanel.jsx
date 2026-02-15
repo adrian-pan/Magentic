@@ -95,10 +95,7 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
     return (
         <div className="import-panel panel">
             <div className="panel-header">
-                <span className="panel-title">DATA_IMPORT</span>
-                {files.length > 0 && (
-                    <span className="panel-badge">CNT:{files.length}</span>
-                )}
+                <span className="panel-title">FILES</span>
             </div>
 
             <div className="panel-content">
@@ -141,7 +138,7 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
                                     onClick={() => handleDelete(file.id)}
                                     title="Remove file"
                                 >
-                                    [DEL]
+                                    X
                                 </button>
                             </div>
                         ))}
@@ -151,7 +148,7 @@ export default function ImportPanel({ files, setFiles, onFilesChange }) {
                         <div className="empty-state-icon">!</div>
                         <div className="empty-state-text">
                             NO_DATA_LOADED<br />
-                            IMPORT_SCRIPTS_OR_NOTES
+                            IMPORT_AUDIO_PLUGINS_OR_INSTRUMENTS
                         </div>
                     </div>
                 )}

@@ -9,6 +9,7 @@
     "benchmark": "node musicPlan/benchmark.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@supabase/supabase-js": "^2.95.3",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",

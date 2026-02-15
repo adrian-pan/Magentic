@@ -101,6 +101,18 @@ def mute_track(track_index: int, muted: bool = True) -> dict:
     return _run(code)
 
 
+def record_arm_track(track_index: int, armed: bool = True) -> dict:
+    """Arm or disarm a track for recording."""
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+        track = RPR.GetTrack(0, {track_index})
+        RPR.SetMediaTrackInfo_Value(track, "I_RECARM", {1 if armed else 0})
+        print(f"Track {track_index} record armed={armed!r}")
+    """
+    return _run(code)
+
+
 def set_track_color(track_index: int, r: int, g: int, b: int) -> dict:
     """Set the track color using RGB values (0–255 each)."""
     code = f"""
@@ -444,9 +456,73 @@ def load_fx_preset(track_index: int, fx_index: int, preset: str) -> dict:
         if success:
             print(f"Loaded preset {preset!r} on FX {fx_index}")
         else:
-            print(f"Failed to load preset {preset!r} — check name or path")
+            idx_info = RPR.TrackFX_GetPresetIndex(track, {fx_index}, 0)
+            total = 0
+            if isinstance(idx_info, (list, tuple)) and len(idx_info) >= 4:
+                total = int(idx_info[3])
+            fx_name_t = RPR.TrackFX_GetFXName(track, {fx_index}, "", 512)
+            fx_name = ""
+            if isinstance(fx_name_t, (list, tuple)):
+                fx_name = fx_name_t[3] if len(fx_name_t) >= 4 else str(fx_name_t[-1])
+            else:
+                fx_name = str(fx_name_t)
+            if total == 0:
+                print(f"PRESET_NOT_FOUND: Plugin '{{fx_name}}' uses an internal preset browser that REAPER cannot access via API. "
+                      f"Use the open_fx_ui tool to open the plugin window, then select the preset {preset!r} manually from the plugin's own preset menu.")
+            else:
+                print(f"PRESET_NOT_FOUND: Preset {preset!r} not found on '{{fx_name}}' ({{total}} REAPER presets available). Check the exact name.")
     """
     return _run(code)
+
+
+def open_fx_ui(track_index: int, fx_index: int) -> dict:
+    """Open the floating FX plugin window in REAPER."""
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+        track = RPR.GetTrack(0, {track_index})
+        RPR.TrackFX_Show(track, {fx_index}, 1)
+        fx_name_t = RPR.TrackFX_GetFXName(track, {fx_index}, "", 512)
+        fx_name = ""
+        if isinstance(fx_name_t, (list, tuple)):
+            fx_name = fx_name_t[3] if len(fx_name_t) >= 4 else str(fx_name_t[-1])
+        else:
+            fx_name = str(fx_name_t)
+        print(f"Opened FX window for '{{fx_name}}' on track {track_index}")
+    """
+    return _run(code)
+
+
+def search_fx_presets(query: str, plugin_name: str = "") -> dict:
+    """Search for FX preset files on disk by name substring."""
+    try:
+        resp = requests.post(
+            f"{BRIDGE_URL}/fx/presets/search",
+            json={"query": query, "plugin_name": plugin_name},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Preset search timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": f"Cannot reach bridge at {BRIDGE_URL}."}
+
+
+def load_preset_file(track_index: int, fx_index: int, preset_path: str) -> dict:
+    """Load an FX preset from a file by setting each parameter directly."""
+    try:
+        resp = requests.post(
+            f"{BRIDGE_URL}/fx/presets/load",
+            json={"track_index": track_index, "fx_index": fx_index, "preset_path": preset_path},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Preset load timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": f"Cannot reach bridge at {BRIDGE_URL}."}
 
 
 def toggle_fx(track_index: int, fx_index: int, enabled: bool = True) -> dict:
@@ -465,33 +541,51 @@ def toggle_fx(track_index: int, fx_index: int, enabled: bool = True) -> dict:
 # Automation / envelope tools
 # ---------------------------------------------------------------------------
 
-def create_volume_envelope(track_index: int, points: list[dict]) -> dict:
-    """Create volume automation on a track.
+def create_volume_envelope(track_index: int, points: list[dict], curve: str = "constant_db") -> dict:
+    """Create volume automation on a track via the dedicated bridge endpoint.
+
+    Uses SetEnvelopeStateChunk (not TrackEnvelope* pointers) so it
+    works reliably over reapy's remote proxy.
 
     points: list of dicts with keys:
       time  — position in seconds (absolute project time)
       value — volume level 0.0–1.0 (1.0 = 0 dB, 0.0 = silence)
+      shape — (optional) 0=linear, 1=square, etc.
 
-    Example — gradual fade from full to 30% over 2 seconds:
-      [{"time": 0.0, "value": 1.0}, {"time": 2.0, "value": 0.3}]
+    curve: "constant_db" (default) for perceptually even fades,
+           "linear" for straight-line gain.
+
+    Example — gradual fade from full to silence over 24 seconds:
+      [{"time": 0.0, "value": 1.0}, {"time": 24.0, "value": 0.0}]
     """
-    code = f"""
-        import reapy
-        RPR = reapy.reascript_api
-        track = RPR.GetTrack(0, {track_index})
-        env = RPR.GetTrackEnvelopeByName(track, "Volume")
-        if not env:
-            RPR.SetTrackSelected(track, True)
-            RPR.Main_OnCommand(40406, 0)  # Track: Add volume envelope
-            env = RPR.GetTrackEnvelopeByName(track, "Volume")
-        points = {points!r}
-        for pt in points:
-            RPR.InsertEnvelopePoint(env, pt['time'], pt['value'], 0, 0, False, True)
-        RPR.Envelope_SortPoints(env)
-        RPR.UpdateArrange()
-        print(f"Added {{len(points)}} volume envelope points to track {track_index}")
-    """
-    return _run(code)
+    try:
+        resp = requests.post(
+            f"{BRIDGE_URL}/envelope/volume",
+            json={"track_index": track_index, "points": points, "curve": curve},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Envelope creation timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": f"Cannot reach bridge at {BRIDGE_URL}. Is it running?"}
+
+
+def remove_volume_envelope(track_index: int) -> dict:
+    """Remove volume automation from a track entirely."""
+    try:
+        resp = requests.post(
+            f"{BRIDGE_URL}/envelope/volume/remove",
+            json={"track_index": track_index},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Envelope removal timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": f"Cannot reach bridge at {BRIDGE_URL}. Is it running?"}
 
 
 # ---------------------------------------------------------------------------
@@ -581,6 +675,18 @@ TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "record_arm_track",
+        "description": "Arm or disarm a track for recording. When armed, the track will record audio/MIDI input during recording.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "armed": {"type": "boolean", "description": "true = arm, false = disarm", "default": True},
+            },
+            "required": ["track_index"],
+        },
+    },
+    {
         "name": "set_tempo",
         "description": "Set the project BPM.",
         "input_schema": {
@@ -641,6 +747,43 @@ TOOL_SCHEMAS = [
                 "preset": {"type": "string", "description": "Preset name or absolute file path, e.g. '/Users/you/presets/patch.fxp'"},
             },
             "required": ["track_index", "fx_index", "preset"],
+        },
+    },
+    {
+        "name": "search_fx_presets",
+        "description": "Search for FX preset files on disk by name. Works for plugins that store presets as files (e.g. Valhalla .vpreset). Returns preset names and file paths.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Preset name to search for (case-insensitive)"},
+                "plugin_name": {"type": "string", "description": "Optional plugin name to narrow search", "default": ""},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "load_preset_file",
+        "description": "Load an FX preset from a file path (from search_fx_presets). Reads preset XML and sets each plugin parameter directly.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "fx_index": {"type": "integer"},
+                "preset_path": {"type": "string", "description": "Full file path to the preset"},
+            },
+            "required": ["track_index", "fx_index", "preset_path"],
+        },
+    },
+    {
+        "name": "open_fx_ui",
+        "description": "Open the floating FX plugin window in REAPER so the user can interact with it directly. Useful when a plugin uses an internal preset browser that REAPER cannot access via API (e.g. ValhallaSupermassive, Serum, Omnisphere).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "fx_index": {"type": "integer"},
+            },
+            "required": ["track_index", "fx_index"],
         },
     },
     {
@@ -772,6 +915,47 @@ TOOL_SCHEMAS = [
             "required": ["track_index", "source_item_index", "target_track_index", "target_item_index", "intervals"],
         },
     },
+    {
+        "name": "create_volume_envelope",
+        "description": "Create or update volume automation (envelope) on a track. Use for fades, swells, ducking, etc. Values: 1.0 = 0 dB (unity), 0.0 = silence. IMPORTANT: Always use curve='constant_db' for fade-ins/outs — it sounds smooth and even. Only use 'linear' for special effects.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer", "description": "Track index (0-based)"},
+                "points": {
+                    "type": "array",
+                    "description": "Automation points with time (seconds), value (0.0-1.0 linear gain), and optional shape.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "time": {"type": "number", "description": "Position in seconds"},
+                            "value": {"type": "number", "description": "Volume: 1.0 = 0 dB, 0.0 = silence"},
+                            "shape": {"type": "integer", "description": "0=linear (default)", "default": 0},
+                        },
+                        "required": ["time", "value"],
+                    },
+                },
+                "curve": {
+                    "type": "string",
+                    "enum": ["linear", "constant_db"],
+                    "description": "Interpolation: 'constant_db' = perceptually even fade (USE THIS for fade-ins/outs). 'linear' = straight gain line (sounds abrupt).",
+                    "default": "constant_db",
+                },
+            },
+            "required": ["track_index", "points"],
+        },
+    },
+    {
+        "name": "remove_volume_envelope",
+        "description": "Remove volume automation (envelope) from a track entirely — clears all points and hides the lane.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer", "description": "Track index (0-based)"},
+            },
+            "required": ["track_index"],
+        },
+    },
 ]
 
 # Map tool name → callable function (used by agent dispatch)
@@ -784,9 +968,14 @@ TOOL_DISPATCH: dict[str, Any] = {
     "add_midi_notes": add_midi_notes,
     "add_fx": add_fx,
     "load_fx_preset": load_fx_preset,
+    "search_fx_presets": search_fx_presets,
+    "load_preset_file": load_preset_file,
+    "open_fx_ui": open_fx_ui,
     "create_volume_envelope": create_volume_envelope,
+    "remove_volume_envelope": remove_volume_envelope,
     "list_fx_params": list_fx_params,
     "set_fx_param": set_fx_param,
+    "record_arm_track": record_arm_track,
     "set_track_color": set_track_color,
     "play": play,
     "stop": stop,

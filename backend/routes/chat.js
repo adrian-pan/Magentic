@@ -19,7 +19,7 @@ const router = express.Router();
 // POST /api/chat
 router.post('/', async (req, res) => {
     try {
-        const { messages, contextFiles, includeProjectState } = req.body;
+        const { messages, contextFiles, includeProjectState, modelSystem } = req.body;
 
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({ error: 'messages array is required' });
@@ -71,11 +71,9 @@ router.post('/', async (req, res) => {
 
     } catch (error) {
         console.error('Chat error:', error.message);
-
         if (error.status === 401) {
-            return res.status(401).json({ error: 'Invalid OpenAI API key. Check your .env file.' });
+            return res.status(401).json({ error: 'Invalid API key. Check your .env file.' });
         }
-
         res.status(500).json({ error: error.message || 'Internal server error' });
     }
 });

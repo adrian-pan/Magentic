@@ -18,6 +18,8 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
     const [reaperStatus, setReaperStatus] = useState(null);
     const [executingBlocks, setExecutingBlocks] = useState({});
     const [executeResults, setExecuteResults] = useState({});
+    const [modelSystem, setModelSystem] = useState('openai'); // 'openai' or 'anthropic'
+
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
 
@@ -97,6 +99,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     messages: updatedMessages,
                     contextFiles,
                     includeProjectState: reaperStatus?.reaper_connected || false,
+                    modelSystem,
                 }),
             });
 
@@ -108,9 +111,10 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
 
             setMessages([...updatedMessages, data.message]);
 
-            // Refresh project state after REAPER execution
-            if (data.executionResults && onAnalyze) {
-                setTimeout(() => onAnalyze(), 500);
+            // Refresh project state after ANY response, as it might have created tracks/clips
+            if (onAnalyze) {
+                // Small delay to ensure bridge/REAPER has processed the state change
+                setTimeout(() => onAnalyze(), 1000);
             }
         } catch (err) {
             setError(err.message);
@@ -189,17 +193,33 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
     return (
         <div className="chat-panel panel">
             <div className="panel-header">
-                <span className="panel-title">MAGENTIC_CORE</span>
+                <span className="panel-title">MAGENTIC</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <select
+                        className="model-select"
+                        value={modelSystem}
+                        onChange={(e) => setModelSystem(e.target.value)}
+                        style={{
+                            background: '#1a1a1a',
+                            color: '#e266efff',
+                            border: '1px solid #333',
+                            borderRadius: '4px',
+                            padding: '4px 6px',
+                            fontSize: '13px',
+                            fontFamily: 'monospace',
+                            outline: 'none',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <option value="openai">GPT-4o</option>
+                        <option value="anthropic">CLAUDE 3.7</option>
+                    </select>
                     {reaperStatus && (
                         <div className={`reaper-status ${reaperStatus.reaper_connected ? 'connected' : 'disconnected'}`}>
                             {reaperStatus.reaper_connected
-                                ? `[LINK: ACTIVE] v${reaperStatus.reaper_version}`
+                                ? `[LINK: ACTIVE] REAPER v${reaperStatus.reaper_version}`
                                 : '[LINK: OFFLINE]'}
                         </div>
-                    )}
-                    {messages.length > 0 && (
-                        <span className="panel-badge">MSG:{messages.length}</span>
                     )}
                 </div>
             </div>
@@ -212,7 +232,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         </div>
                         <h2 className="welcome-title">SYSTEM_READY</h2>
                         <p className="welcome-subtitle">
-                            MAGENTIC_OS v1.0 INITIALIZED.<br />
+                            MAGENTIC INITIALIZED.<br />
                             AWAITING INPUT FOR AUDIO SEQUENCING OPERATIONS.
                         </p>
                         <div className="welcome-chips">
@@ -231,9 +251,11 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                     <>
                         {messages.map((msg, i) => (
                             <div key={i} className={`message ${msg.role}`}>
-                                <div className="message-avatar">
-                                    {msg.role === 'user' ? 'USR' : 'SYS'}
-                                </div>
+                                {msg.role !== 'user' && (
+                                    <div className="message-avatar">
+                                        <Logo size={40} />
+                                    </div>
+                                )}
                                 <div className="message-bubble">
                                     {renderContent(msg.content, i)}
                                 </div>
@@ -241,7 +263,9 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         ))}
                         {isLoading && (
                             <div className="message assistant">
-                                <div className="message-avatar">SYS</div>
+                                <div className="message-avatar">
+                                    <Logo size={40} />
+                                </div>
                                 <div className="message-bubble">
                                     <div className="typing-indicator">
                                         <div className="typing-dot" />

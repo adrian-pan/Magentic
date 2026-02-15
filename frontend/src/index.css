@@ -52,7 +52,7 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-primary);
 }
 
@@ -154,7 +154,21 @@ body::after {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--bg-primary);
+  background: url('/Magentic Background.png') center center / cover no-repeat fixed;
+  position: relative;
+}
+
+.app-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 0;
+}
+
+.app-container>* {
+  position: relative;
+  z-index: 1;
 }
 
 .app-header {
@@ -162,10 +176,11 @@ body::after {
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  background: var(--bg-primary);
+  background: rgba(0, 0, 0, 0.3);
   border-bottom: 1px solid var(--border-strong);
   flex-shrink: 0;
   z-index: 10;
+  backdrop-filter: blur(2px);
 }
 
 .app-logo {
@@ -228,27 +243,21 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 0 16px;
+  height: 48px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-secondary);
   flex-shrink: 0;
 }
 
 .panel-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--text-primary);
 }
 
-.panel-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-primary);
-  color: var(--text-secondary);
-}
+/* Panel badge removed */
 
 /* ========================
    LEFT SIDEBAR
@@ -257,7 +266,8 @@ body::after {
 .left-sidebar {
   width: 320px;
   min-width: 280px;
-  background: var(--bg-primary);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
   border-right: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
@@ -270,13 +280,12 @@ body::after {
   flex-shrink: 0;
   max-height: 45%;
   overflow: hidden;
-  border-bottom: 1px solid var(--border-strong);
 }
 
 .import-panel .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0;
+  padding: 16px;
   /* Remove padding for grid feel */
 }
 
@@ -284,8 +293,6 @@ body::after {
 .file-list {
   display: flex;
   flex-direction: column;
-  gap: -1px;
-  /* Overlap borders */
 }
 
 .file-item {
@@ -294,9 +301,14 @@ body::after {
   gap: 12px;
   padding: 10px 16px;
   background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
+  margin-top: -1px;
   border-radius: 0;
   transition: background 0.1s;
+}
+
+.file-item:first-child {
+  margin-top: 0;
 }
 
 .file-item:hover {
@@ -304,7 +316,7 @@ body::after {
 }
 
 .file-icon {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .file-info {
@@ -329,26 +341,33 @@ body::after {
 }
 
 .file-delete {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
+  padding: 4px 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
 }
 
 .file-delete:hover {
+  border-color: var(--text-primary);
   color: var(--text-primary);
+  background: var(--bg-secondary);
 }
 
 /* Drag Zone */
 .drop-zone {
-  border: 1px dashed var(--text-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 0;
   padding: 24px;
   text-align: center;
   cursor: pointer;
   background: var(--bg-primary);
-  margin: 16px;
+  margin: 0 0 16px;
 }
 
 .drop-zone:hover,
@@ -358,7 +377,7 @@ body::after {
 }
 
 .drop-zone-icon {
-  font-size: 24px;
+  font-size: 20px;
   margin-bottom: 8px;
   opacity: 1;
 }
@@ -376,14 +395,14 @@ body::after {
 
 .empty-state {
   text-align: center;
-  padding: 32px 16px;
-  color: var(--text-muted);
+  padding: 16px 16px 32px;
+  color: var(--text-primary);
 }
 
 .empty-state-icon {
   font-size: 32px;
   margin-bottom: 12px;
-  opacity: 0.5;
+  opacity: 1;
 }
 
 .empty-state-text {
@@ -397,7 +416,8 @@ body::after {
 
 .chat-panel {
   flex: 1;
-  background: var(--bg-primary);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
   display: flex;
   flex-direction: column;
 }
@@ -413,7 +433,7 @@ body::after {
 
 .message {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   max-width: 100%;
 }
 
@@ -435,9 +455,13 @@ body::after {
   flex-shrink: 0;
 }
 
-.message.user .message-avatar {
-  background: var(--text-primary);
-  color: var(--bg-primary);
+/* User avatar removed */
+
+.message.assistant .message-avatar {
+  border: none;
+  background: transparent;
+  width: 40px;
+  height: 40px;
 }
 
 .message-bubble {
@@ -504,8 +528,6 @@ body::after {
   flex: 1;
   padding: 40px;
   text-align: center;
-  border: 1px solid var(--border-color);
-  margin: 20px;
 }
 
 .welcome-icon {
@@ -522,7 +544,7 @@ body::after {
 
 .welcome-subtitle {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   max-width: 400px;
   line-height: 1.6;
   margin-bottom: 32px;
@@ -541,7 +563,7 @@ body::after {
   border: 1px solid var(--border-color);
   font-size: 12px;
   color: var(--text-secondary);
-  background: transparent;
+  background: #000000;
   cursor: pointer;
   text-transform: uppercase;
 }
@@ -557,16 +579,16 @@ body::after {
   padding: 20px;
   border-top: 1px solid var(--border-strong);
   flex-shrink: 0;
-  background: var(--bg-primary);
+  background: #000000;
 }
 
 .chat-input-wrapper {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--bg-primary);
+  background: #000000;
   border: 1px solid var(--text-primary);
-  padding: 12px;
+  padding: 12px 16px;
 }
 
 .chat-input-wrapper:focus-within {
@@ -658,19 +680,22 @@ body::after {
 .project-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0;
+  padding: 16px;
 }
 
 .project-info {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
 }
 
 .project-info-item {
   padding: 12px;
   border-right: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
+  background: #000000;
+  opacity: 1;
 }
 
 .project-info-label {
@@ -689,27 +714,27 @@ body::after {
 .track-list {
   display: flex;
   flex-direction: column;
+  border-top: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  margin-top: 16px;
 }
 
 .track-item {
-  padding: 0;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-}
-
-.track-header {
   padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: #000000;
+  opacity: 1;
 }
 
-.track-item:hover .track-header {
+.track-item:hover {
   background: var(--bg-secondary);
 }
 
-.track-item.muted .track-name {
+.track-item.muted {
   opacity: 0.5;
   text-decoration: line-through;
 }
@@ -721,13 +746,6 @@ body::after {
 .track-meta {
   display: flex;
   gap: 4px;
-  align-items: center;
-}
-
-.track-expand {
-  font-size: 12px;
-  margin-left: 4px;
-  opacity: 0.7;
 }
 
 .track-fx-count,
@@ -735,60 +753,6 @@ body::after {
   font-size: 10px;
   border: 1px solid var(--border-color);
   padding: 0 4px;
-}
-
-.track-detail {
-  padding: 4px 12px 8px 24px;
-  background: var(--bg-tertiary);
-  border-top: 1px solid var(--border-color);
-}
-
-.track-fx-list,
-.track-items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.track-fx-list {
-  margin-bottom: 6px;
-}
-
-.rack-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-}
-
-.rack-label {
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rack-delete-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 12px;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.rack-delete-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--text-primary);
-}
-
-.rack-delete-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .analyze-btn {
@@ -805,4 +769,158 @@ body::after {
 .analyze-btn:hover {
   background: var(--text-primary);
   color: var(--bg-primary);
+}
+
+/* ========================
+   WELCOME PAGE
+   ======================== */
+
+.welcome-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: url('/Magentic Background.png') center center / cover no-repeat fixed;
+  position: relative;
+  padding: 40px 20px;
+  gap: 0;
+}
+
+/* Subtle dark overlay for readability */
+.welcome-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(1px);
+  z-index: 0;
+}
+
+.welcome-page>* {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Hero: Logo + Title + Tagline ---- */
+
+.welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 56px;
+}
+
+.welcome-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.welcome-logo-img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
+
+.welcome-logo-title {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.welcome-tagline {
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  line-height: 1.8;
+  color: var(--text-primary);
+  opacity: 0.9;
+}
+
+/* ---- CTA Section ---- */
+
+.welcome-cta-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 64px;
+}
+
+.welcome-transmit-btn {
+  background: var(--text-primary);
+  border: 1.5px solid var(--text-primary);
+  color: var(--bg-primary);
+  padding: 16px 80px;
+  font-family: inherit;
+  font-size: 18px;
+  text-transform: uppercase;
+  cursor: pointer;
+  letter-spacing: 2px;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+}
+
+.welcome-transmit-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+.welcome-transmit-btn:active {
+  transform: scale(0.98);
+}
+
+/* ---- Feature Cards ---- */
+
+.welcome-features {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.welcome-feature-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 32px;
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0);
+  width: 220px;
+  text-align: center;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.welcome-feature-card:hover {
+  border-color: var(--text-primary);
+  background: rgba(0, 0, 0);
+  transform: translateY(-4px);
+}
+
+.welcome-feature-card:hover .welcome-feature-label {
+  color: var(--text-primary);
+}
+
+.welcome-feature-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.welcome-feature-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
 }
