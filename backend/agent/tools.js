@@ -186,6 +186,16 @@ print(f"Track ${track_index} muted=${muted}")
     `);
 }
 
+async function recordArmTrack({ track_index, armed = true }) {
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+track = RPR.GetTrack(0, ${track_index})
+RPR.SetMediaTrackInfo_Value(track, "I_RECARM", ${armed ? 1 : 0})
+print(f"Track ${track_index} record armed=${armed}")
+    `);
+}
+
 async function setTrackColor({ track_index, r, g, b }) {
     return runCode(`
 import reapy
@@ -522,7 +532,7 @@ async function removeFx({ track_index, fx_index }) {
 import reapy
 RPR = reapy.reascript_api
 track = RPR.GetTrack(0, int(${track_index}))
-RPR.TrackFX_Remove(track, int(${fx_index}))
+RPR.TrackFX_Delete(track, int(${fx_index}))
 print(f"Removed FX ${fx_index} from track ${track_index}")
     `);
 }
@@ -871,6 +881,7 @@ const TOOL_DISPATCH = {
     set_track_volume: setTrackVolume,
     set_track_pan: setTrackPan,
     mute_track: muteTrack,
+    record_arm_track: recordArmTrack,
     set_track_color: setTrackColor,
     set_tempo: setTempo,
     create_midi_item: createMidiItem,
@@ -973,6 +984,21 @@ const TOOL_SCHEMAS = [
                 properties: {
                     track_index: { type: 'integer' },
                     muted: { type: 'boolean', default: true },
+                },
+                required: ['track_index'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'record_arm_track',
+            description: 'Arm or disarm a track for recording. When armed, the track will record audio/MIDI input during recording.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer' },
+                    armed: { type: 'boolean', description: 'true = arm for recording, false = disarm', default: true },
                 },
                 required: ['track_index'],
             },
