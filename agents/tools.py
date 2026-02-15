@@ -456,9 +456,73 @@ def load_fx_preset(track_index: int, fx_index: int, preset: str) -> dict:
         if success:
             print(f"Loaded preset {preset!r} on FX {fx_index}")
         else:
-            print(f"Failed to load preset {preset!r} — check name or path")
+            idx_info = RPR.TrackFX_GetPresetIndex(track, {fx_index}, 0)
+            total = 0
+            if isinstance(idx_info, (list, tuple)) and len(idx_info) >= 4:
+                total = int(idx_info[3])
+            fx_name_t = RPR.TrackFX_GetFXName(track, {fx_index}, "", 512)
+            fx_name = ""
+            if isinstance(fx_name_t, (list, tuple)):
+                fx_name = fx_name_t[3] if len(fx_name_t) >= 4 else str(fx_name_t[-1])
+            else:
+                fx_name = str(fx_name_t)
+            if total == 0:
+                print(f"PRESET_NOT_FOUND: Plugin '{{fx_name}}' uses an internal preset browser that REAPER cannot access via API. "
+                      f"Use the open_fx_ui tool to open the plugin window, then select the preset {preset!r} manually from the plugin's own preset menu.")
+            else:
+                print(f"PRESET_NOT_FOUND: Preset {preset!r} not found on '{{fx_name}}' ({{total}} REAPER presets available). Check the exact name.")
     """
     return _run(code)
+
+
+def open_fx_ui(track_index: int, fx_index: int) -> dict:
+    """Open the floating FX plugin window in REAPER."""
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+        track = RPR.GetTrack(0, {track_index})
+        RPR.TrackFX_Show(track, {fx_index}, 1)
+        fx_name_t = RPR.TrackFX_GetFXName(track, {fx_index}, "", 512)
+        fx_name = ""
+        if isinstance(fx_name_t, (list, tuple)):
+            fx_name = fx_name_t[3] if len(fx_name_t) >= 4 else str(fx_name_t[-1])
+        else:
+            fx_name = str(fx_name_t)
+        print(f"Opened FX window for '{{fx_name}}' on track {track_index}")
+    """
+    return _run(code)
+
+
+def search_fx_presets(query: str, plugin_name: str = "") -> dict:
+    """Search for FX preset files on disk by name substring."""
+    try:
+        resp = requests.post(
+            f"{BRIDGE_URL}/fx/presets/search",
+            json={"query": query, "plugin_name": plugin_name},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Preset search timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": f"Cannot reach bridge at {BRIDGE_URL}."}
+
+
+def load_preset_file(track_index: int, fx_index: int, preset_path: str) -> dict:
+    """Load an FX preset from a file by setting each parameter directly."""
+    try:
+        resp = requests.post(
+            f"{BRIDGE_URL}/fx/presets/load",
+            json={"track_index": track_index, "fx_index": fx_index, "preset_path": preset_path},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Preset load timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": f"Cannot reach bridge at {BRIDGE_URL}."}
 
 
 def toggle_fx(track_index: int, fx_index: int, enabled: bool = True) -> dict:
@@ -686,6 +750,43 @@ TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "search_fx_presets",
+        "description": "Search for FX preset files on disk by name. Works for plugins that store presets as files (e.g. Valhalla .vpreset). Returns preset names and file paths.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Preset name to search for (case-insensitive)"},
+                "plugin_name": {"type": "string", "description": "Optional plugin name to narrow search", "default": ""},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "load_preset_file",
+        "description": "Load an FX preset from a file path (from search_fx_presets). Reads preset XML and sets each plugin parameter directly.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "fx_index": {"type": "integer"},
+                "preset_path": {"type": "string", "description": "Full file path to the preset"},
+            },
+            "required": ["track_index", "fx_index", "preset_path"],
+        },
+    },
+    {
+        "name": "open_fx_ui",
+        "description": "Open the floating FX plugin window in REAPER so the user can interact with it directly. Useful when a plugin uses an internal preset browser that REAPER cannot access via API (e.g. ValhallaSupermassive, Serum, Omnisphere).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "fx_index": {"type": "integer"},
+            },
+            "required": ["track_index", "fx_index"],
+        },
+    },
+    {
         "name": "add_fx",
         "description": "Add a VST/AU plugin to a track by name.",
         "input_schema": {
@@ -867,6 +968,9 @@ TOOL_DISPATCH: dict[str, Any] = {
     "add_midi_notes": add_midi_notes,
     "add_fx": add_fx,
     "load_fx_preset": load_fx_preset,
+    "search_fx_presets": search_fx_presets,
+    "load_preset_file": load_preset_file,
+    "open_fx_ui": open_fx_ui,
     "create_volume_envelope": create_volume_envelope,
     "remove_volume_envelope": remove_volume_envelope,
     "list_fx_params": list_fx_params,

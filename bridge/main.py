@@ -476,6 +476,136 @@ def remove_volume_envelope(request: RemoveEnvelopeRequest):
             return {"success": False, "error": f"{str(e)}\n{tb}"}
 
 
+# ---------------------------------------------------------------------------
+# FX preset search & load (for plugins with internal preset browsers)
+# ---------------------------------------------------------------------------
+
+# Known plugin preset directories on macOS
+_PRESET_SEARCH_PATHS = [
+    "/Library/Application Support/Valhalla DSP, LLC",
+    os.path.expanduser("~/Library/Application Support/Valhalla DSP, LLC"),
+]
+
+_PRESET_EXTENSIONS = {".vpreset", ".fxp", ".vstpreset", ".xml"}
+
+# Metadata attributes to skip when setting parameters from a preset file
+_PRESET_SKIP_ATTRS = {"pluginVersion", "presetName", "mixLock", "uiWidth", "uiHeight",
+                       "version", "name", "type", "category"}
+
+
+class SearchPresetsRequest(BaseModel):
+    query: str  # substring to match in preset filename (case-insensitive)
+    plugin_name: str = ""  # optional substring to narrow to a specific plugin
+
+
+class LoadPresetFileRequest(BaseModel):
+    track_index: int
+    fx_index: int
+    preset_path: str  # full path to the .vpreset file
+
+
+@app.post("/fx/presets/search")
+def search_fx_presets(request: SearchPresetsRequest):
+    """Search for FX preset files on disk by name substring."""
+    try:
+        query = request.query.strip().lower()
+        plugin_filter = request.plugin_name.strip().lower()
+        if not query:
+            return {"success": False, "error": "query is required"}
+
+        matches = []
+        for base_path in _PRESET_SEARCH_PATHS:
+            if not os.path.isdir(base_path):
+                continue
+            for root_dir, _dirs, files in os.walk(base_path):
+                # Optional: filter by plugin name in path
+                if plugin_filter and plugin_filter not in root_dir.lower():
+                    continue
+                for fname in files:
+                    _name, ext = os.path.splitext(fname)
+                    if ext.lower() not in _PRESET_EXTENSIONS:
+                        continue
+                    if query in fname.lower():
+                        full_path = os.path.join(root_dir, fname)
+                        # Extract category from directory structure
+                        rel = os.path.relpath(full_path, base_path)
+                        matches.append({
+                            "name": _name,
+                            "file": fname,
+                            "path": full_path,
+                            "category": os.path.dirname(rel),
+                        })
+
+        matches.sort(key=lambda m: m["name"].lower())
+        return {
+            "success": True,
+            "query": request.query,
+            "count": len(matches),
+            "presets": matches[:50],  # cap at 50 results
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/fx/presets/load")
+def load_fx_preset_file(request: LoadPresetFileRequest):
+    """Load an FX preset from a .vpreset XML file by setting each parameter directly."""
+    with REAPY_LOCK:
+        try:
+            import xml.etree.ElementTree as ET
+
+            RPR = reapy.reascript_api
+
+            # Validate path
+            if not os.path.isfile(request.preset_path):
+                return {"success": False, "error": f"File not found: {request.preset_path}"}
+
+            # Parse preset XML
+            tree = ET.parse(request.preset_path)
+            root = tree.getroot()
+            preset_name = root.attrib.get("presetName", os.path.splitext(os.path.basename(request.preset_path))[0])
+
+            # Build plugin parameter map: name -> index
+            track = RPR.GetTrack(0, request.track_index)
+            n_params = int(RPR.TrackFX_GetNumParams(track, request.fx_index))
+            param_map = {}
+            for i in range(n_params):
+                name_t = RPR.TrackFX_GetParamName(track, request.fx_index, i, "", 256)
+                pname = name_t[4] if isinstance(name_t, (list, tuple)) and len(name_t) >= 5 else str(name_t)
+                param_map[pname] = i
+
+            # Set each parameter from the preset file
+            set_count = 0
+            skipped = []
+            for attr, val in root.attrib.items():
+                if attr in _PRESET_SKIP_ATTRS:
+                    continue
+                if attr in param_map:
+                    try:
+                        RPR.TrackFX_SetParamNormalized(track, request.fx_index, param_map[attr], float(val))
+                        set_count += 1
+                    except (ValueError, TypeError):
+                        skipped.append(attr)
+                else:
+                    skipped.append(attr)
+
+            result = {
+                "success": True,
+                "output": f"Loaded preset '{preset_name}': set {set_count} parameters on FX {request.fx_index} (track {request.track_index})",
+                "preset_name": preset_name,
+                "params_set": set_count,
+            }
+            if skipped:
+                result["skipped_attrs"] = skipped
+            return result
+
+        except ET.ParseError as e:
+            return {"success": False, "error": f"Invalid preset XML: {e}"}
+        except Exception as e:
+            tb = traceback.format_exc()
+            return {"success": False, "error": f"{str(e)}\n{tb}"}
+
+
 @app.get("/")
 def root():
     return {
@@ -489,6 +619,8 @@ def root():
             "GET /analyze/instruments": "List installed VST/AU instruments",
             "POST /envelope/volume": "Create/update volume automation on a track",
             "POST /envelope/volume/remove": "Remove volume automation from a track",
+            "POST /fx/presets/search": "Search for FX preset files on disk by name",
+            "POST /fx/presets/load": "Load an FX preset from a file by setting parameters",
         },
     }
 

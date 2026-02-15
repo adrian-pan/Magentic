@@ -150,6 +150,20 @@ fx.params["Dry Gain"]              # Get/set param by name
 fx.delete()                        # Remove FX
 \`\`\`
 
+### Loading FX Presets
+Some plugins (e.g. ValhallaSupermassive, Serum, Omnisphere) use **internal preset browsers** that REAPER's standard API cannot access. When \`load_fx_preset\` fails with a "PRESET_NOT_FOUND" message mentioning "internal preset browser", use the **preset file workflow**:
+
+1. Call \`search_fx_presets({ query: "preset name" })\` to find the preset file on disk. You can optionally pass \`plugin_name\` to narrow results (e.g. \`"supermassive"\`).
+2. If results are found, call \`load_preset_file({ track_index, fx_index, preset_path: "<path from search>" })\` to load it by setting each parameter directly.
+3. If no results found, fall back to \`open_fx_ui(track_index, fx_index)\` and tell the user to select the preset manually.
+
+**Example workflow for "load Brass Blatt on ValhallaSupermassive":**
+- First try: \`load_fx_preset\` → fails (internal preset browser)
+- Search: \`search_fx_presets({ query: "Brass Blatt", plugin_name: "supermassive" })\` → returns file path
+- Load: \`load_preset_file({ track_index: 0, fx_index: 0, preset_path: "/Library/..." })\` → success, 18 params set
+
+\`load_fx_preset\` still works reliably for REAPER's built-in plugins (ReaEQ, ReaComp, ReaVerbate, etc.).
+
 ### Removing FX — USE THE TOOL
 **To remove an FX (e.g. Serum, ReaEQ) from a track, use the \`remove_fx\` tool.** Do NOT generate python:execute code for this.
 1. From the project state, find the track by name (e.g. "Kick Pattern")

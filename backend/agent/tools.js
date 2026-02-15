@@ -301,8 +301,80 @@ success = RPR.TrackFX_SetPreset(track, ${fx_index}, ${JSON.stringify(preset)})
 if success:
     print(f"Loaded preset ${preset} on FX ${fx_index}")
 else:
-    print(f"Failed to load preset ${preset} — check name or path")
+    # Check if the plugin exposes any presets to REAPER at all
+    idx_info = RPR.TrackFX_GetPresetIndex(track, ${fx_index}, 0)
+    total = 0
+    if isinstance(idx_info, (list, tuple)) and len(idx_info) >= 4:
+        total = int(idx_info[3])
+    fx_name_t = RPR.TrackFX_GetFXName(track, ${fx_index}, "", 512)
+    fx_name = ""
+    if isinstance(fx_name_t, (list, tuple)):
+        fx_name = fx_name_t[3] if len(fx_name_t) >= 4 else str(fx_name_t[-1])
+    else:
+        fx_name = str(fx_name_t)
+    if total == 0:
+        print(f"PRESET_NOT_FOUND: Plugin '{fx_name}' uses an internal preset browser that REAPER cannot access via API. "
+              f"Use the open_fx_ui tool to open the plugin window, then select the preset '{${JSON.stringify(preset)}}' manually from the plugin's own preset menu.")
+    else:
+        print(f"PRESET_NOT_FOUND: Preset '{${JSON.stringify(preset)}}' not found on '{fx_name}' ({total} REAPER presets available). Check the exact name.")
     `);
+}
+
+async function openFxUi({ track_index, fx_index }) {
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+track = RPR.GetTrack(0, ${track_index})
+# showFlag: 1 = show floating FX window
+RPR.TrackFX_Show(track, ${fx_index}, 1)
+fx_name_t = RPR.TrackFX_GetFXName(track, ${fx_index}, "", 512)
+fx_name = ""
+if isinstance(fx_name_t, (list, tuple)):
+    fx_name = fx_name_t[3] if len(fx_name_t) >= 4 else str(fx_name_t[-1])
+else:
+    fx_name = str(fx_name_t)
+print(f"Opened FX window for '{fx_name}' on track ${track_index}")
+    `);
+}
+
+async function searchFxPresets({ query, plugin_name = '' }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+        const res = await fetch(`${BRIDGE_URL}/fx/presets/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, plugin_name }),
+            signal: controller.signal,
+        });
+        return await res.json();
+    } catch (err) {
+        if (err.name === 'AbortError') return { success: false, error: 'Preset search timed out' };
+        if (err.cause?.code === 'ECONNREFUSED') return { success: false, error: `Cannot reach bridge at ${BRIDGE_URL}` };
+        return { success: false, error: err.message };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function loadPresetFile({ track_index, fx_index, preset_path }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+        const res = await fetch(`${BRIDGE_URL}/fx/presets/load`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track_index, fx_index, preset_path }),
+            signal: controller.signal,
+        });
+        return await res.json();
+    } catch (err) {
+        if (err.name === 'AbortError') return { success: false, error: 'Preset load timed out' };
+        if (err.cause?.code === 'ECONNREFUSED') return { success: false, error: `Cannot reach bridge at ${BRIDGE_URL}` };
+        return { success: false, error: err.message };
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 async function toggleFx({ track_index, fx_index, enabled = true }) {
@@ -890,6 +962,9 @@ const TOOL_DISPATCH = {
     set_fx_param: setFxParam,
     list_fx_params: listFxParams,
     load_fx_preset: loadFxPreset,
+    search_fx_presets: searchFxPresets,
+    load_preset_file: loadPresetFile,
+    open_fx_ui: openFxUi,
     toggle_fx: toggleFx,
     delete_midi_item: deleteMidiItem,
     remove_fx: removeFx,
@@ -1141,6 +1216,52 @@ const TOOL_SCHEMAS = [
                     preset: { type: 'string', description: 'Preset name or absolute file path' },
                 },
                 required: ['track_index', 'fx_index', 'preset'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'search_fx_presets',
+            description: 'Search for FX preset files on disk by name. Works for plugins that store presets as files (e.g. Valhalla .vpreset files). Returns matching preset names and file paths. Use this when load_fx_preset fails with "internal preset browser" — search for the preset, then use load_preset_file with the path.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Preset name to search for (case-insensitive substring match)' },
+                    plugin_name: { type: 'string', description: 'Optional plugin name to narrow search (e.g. "supermassive")', default: '' },
+                },
+                required: ['query'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'load_preset_file',
+            description: 'Load an FX preset from a file path (returned by search_fx_presets). Reads the preset XML and sets each plugin parameter directly. Works for Valhalla .vpreset files and similar XML-based preset formats.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer' },
+                    fx_index: { type: 'integer' },
+                    preset_path: { type: 'string', description: 'Full file path to the preset (from search_fx_presets results)' },
+                },
+                required: ['track_index', 'fx_index', 'preset_path'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'open_fx_ui',
+            description: 'Open the floating FX plugin window in REAPER so the user can interact with it directly. Use as a last resort when preset loading tools cannot handle the plugin format.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer' },
+                    fx_index: { type: 'integer' },
+                },
+                required: ['track_index', 'fx_index'],
             },
         },
     },
