@@ -26,6 +26,7 @@ def separate_stems(
     output_dir: Union[str, Path],
     model: str = "htdemucs",
     format: str = "mp3",
+    device: str = os.environ.get("DEMUCS_DEVICE", "cuda"),
 ) -> dict[str, str]:
     """
     Separate audio into stems (drums, bass, vocals, other) using Demucs.
@@ -56,6 +57,8 @@ def separate_stems(
         "demucs.separate",
         "-n",
         model,
+        "-d",
+        device,
         "-o",
         str(output_dir),
         str(input_path),
@@ -63,7 +66,24 @@ def separate_stems(
     if format == "mp3":
         cmd.insert(-1, "--mp3")
 
-    subprocess.run(cmd, check=True, env=env, cwd=str(_DEMUCS_DIR))
+    result = subprocess.run(cmd, env=env, cwd=str(_DEMUCS_DIR), capture_output=True, text=True)
+    if result.returncode != 0:
+        err_msg = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+        # Auto-fallback to CPU if CUDA fails (e.g. cuFFT driver/runtime issues).
+        if device != "cpu" and "CUFFT" in err_msg.upper():
+            # Clean any partial output before retry.
+            for d in output_dir.iterdir():
+                if d.is_dir():
+                    shutil.rmtree(d)
+            cpu_cmd = cmd.copy()
+            device_idx = cpu_cmd.index("-d") + 1
+            cpu_cmd[device_idx] = "cpu"
+            result = subprocess.run(cpu_cmd, env=env, cwd=str(_DEMUCS_DIR), capture_output=True, text=True)
+            if result.returncode != 0:
+                err_msg = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+                raise RuntimeError(f"Demucs failed (CPU fallback): {err_msg}")
+        else:
+            raise RuntimeError(f"Demucs failed: {err_msg}")
 
     song_name = input_path.stem
     demucs_stems_dir = output_dir / model / song_name

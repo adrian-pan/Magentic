@@ -42,22 +42,29 @@ async function runCode(code, timeout = 60000) {
 // ---------------------------------------------------------------------------
 
 async function analyzeProject() {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
     try {
-        const res = await fetch(`${BRIDGE_URL}/analyze`, { timeout: 60000 });
+        const res = await fetch(`${BRIDGE_URL}/analyze`, { signal: controller.signal });
         return await res.json();
     } catch (err) {
-        return { success: false, error: `Cannot reach bridge: ${err.message}` };
+        if (err.name === 'AbortError') return { success: false, error: 'Bridge /analyze timed out after 60s' };
+        if (err.cause?.code === 'ECONNREFUSED') return { success: false, error: `Cannot reach bridge at ${BRIDGE_URL}. Is it running?` };
+        return { success: false, error: err.message };
+    } finally {
+        clearTimeout(timer);
     }
 }
 
 async function createTrack({ name, index = -1 }) {
     return runCode(`
 import reapy
-p = reapy.Project()
-idx = ${index}
-if idx < 0:
-    idx = p.n_tracks
-p.add_track(index=idx, name=${JSON.stringify(name)})
+RPR = reapy.reascript_api
+n = RPR.CountTracks(0)
+idx = ${index} if ${index} >= 0 else n
+RPR.InsertTrackAtIndex(idx, True)
+track = RPR.GetTrack(0, idx)
+RPR.GetSetMediaTrackInfo_String(track, "P_NAME", ${JSON.stringify(name)}, True)
 print(f"Created track '${name}' at index {idx}")
     `);
 }

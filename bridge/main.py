@@ -45,9 +45,9 @@ def get_status():
     """Check if REAPER is reachable via reapy."""
     try:
         import reapy
-
-        version = reapy.get_reaper_version()
-        return StatusResponse(reaper_connected=True, reaper_version=version)
+        RPR = reapy.reascript_api
+        version = RPR.GetAppVersion()
+        return StatusResponse(reaper_connected=True, reaper_version=str(version))
     except Exception as e:
         return StatusResponse(reaper_connected=False, error=str(e))
 

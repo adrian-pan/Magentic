@@ -1,0 +1,8 @@
+.git
+*.pyc
+__pycache__
+.venv
+venv
+*.md
+demucs/.git
+basic-pitch/.git
