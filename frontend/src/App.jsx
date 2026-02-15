@@ -64,13 +64,6 @@ export default function App() {
           <div className="project-panel">
             <div className="panel-header">
               <span className="panel-title">PROJECT</span>
-              <button
-                className="analyze-btn"
-                onClick={analyzeProject}
-                disabled={isAnalyzing}
-              >
-                {isAnalyzing ? '[SCANNING...]' : '[REFRESH]'}
-              </button>
             </div>
             <div className="project-content">
               {projectState ? (

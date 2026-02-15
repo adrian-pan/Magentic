@@ -111,9 +111,10 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
 
             setMessages([...updatedMessages, data.message]);
 
-            // Refresh project state after REAPER execution
-            if (data.executionResults && onAnalyze) {
-                setTimeout(() => onAnalyze(), 500);
+            // Refresh project state after ANY response, as it might have created tracks/clips
+            if (onAnalyze) {
+                // Small delay to ensure bridge/REAPER has processed the state change
+                setTimeout(() => onAnalyze(), 1000);
             }
         } catch (err) {
             setError(err.message);
