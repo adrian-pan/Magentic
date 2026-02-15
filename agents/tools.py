@@ -101,6 +101,18 @@ def mute_track(track_index: int, muted: bool = True) -> dict:
     return _run(code)
 
 
+def record_arm_track(track_index: int, armed: bool = True) -> dict:
+    """Arm or disarm a track for recording."""
+    code = f"""
+        import reapy
+        RPR = reapy.reascript_api
+        track = RPR.GetTrack(0, {track_index})
+        RPR.SetMediaTrackInfo_Value(track, "I_RECARM", {1 if armed else 0})
+        print(f"Track {track_index} record armed={armed!r}")
+    """
+    return _run(code)
+
+
 def set_track_color(track_index: int, r: int, g: int, b: int) -> dict:
     """Set the track color using RGB values (0–255 each)."""
     code = f"""
@@ -599,6 +611,18 @@ TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "record_arm_track",
+        "description": "Arm or disarm a track for recording. When armed, the track will record audio/MIDI input during recording.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "track_index": {"type": "integer"},
+                "armed": {"type": "boolean", "description": "true = arm, false = disarm", "default": True},
+            },
+            "required": ["track_index"],
+        },
+    },
+    {
         "name": "set_tempo",
         "description": "Set the project BPM.",
         "input_schema": {
@@ -847,6 +871,7 @@ TOOL_DISPATCH: dict[str, Any] = {
     "remove_volume_envelope": remove_volume_envelope,
     "list_fx_params": list_fx_params,
     "set_fx_param": set_fx_param,
+    "record_arm_track": record_arm_track,
     "set_track_color": set_track_color,
     "play": play,
     "stop": stop,
