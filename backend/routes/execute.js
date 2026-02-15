@@ -66,6 +66,62 @@ router.get('/analyze', async (req, res) => {
     }
 });
 
+// POST /api/reaper/delete-midi-item — delete a MIDI item from a track
+router.post('/delete-midi-item', async (req, res) => {
+    try {
+        const { track_index, item_index } = req.body;
+        if (track_index == null || item_index == null) {
+            return res.status(400).json({ success: false, error: 'track_index and item_index required' });
+        }
+        const code = `
+import reapy
+RPR = reapy.reascript_api
+track = RPR.GetTrack(0, int(${track_index}))
+item = RPR.GetTrackMediaItem(track, int(${item_index}))
+if item:
+    RPR.DeleteTrackMediaItem(track, item)
+    print(f"Deleted MIDI item ${item_index} from track ${track_index}")
+else:
+    raise ValueError(f"No item at index ${item_index} on track ${track_index}")
+`;
+        const response = await fetch(`${BRIDGE_URL}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/reaper/remove-fx — remove an FX from a track
+router.post('/remove-fx', async (req, res) => {
+    try {
+        const { track_index, fx_index } = req.body;
+        if (track_index == null || fx_index == null) {
+            return res.status(400).json({ success: false, error: 'track_index and fx_index required' });
+        }
+        const code = `
+import reapy
+RPR = reapy.reascript_api
+track = RPR.GetTrack(0, int(${track_index}))
+RPR.TrackFX_Remove(track, int(${fx_index}))
+print(f"Removed FX ${fx_index} from track ${track_index}")
+`;
+        const response = await fetch(`${BRIDGE_URL}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // GET /api/reaper/analyze/instruments — list installed instruments
 router.get('/analyze/instruments', async (req, res) => {
     try {

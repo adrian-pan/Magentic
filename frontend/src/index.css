@@ -692,18 +692,24 @@ body::after {
 }
 
 .track-item {
-  padding: 8px 12px;
+  padding: 0;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.track-header {
+  padding: 8px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.track-item:hover {
+.track-item:hover .track-header {
   background: var(--bg-secondary);
 }
 
-.track-item.muted {
+.track-item.muted .track-name {
   opacity: 0.5;
   text-decoration: line-through;
 }
@@ -715,6 +721,13 @@ body::after {
 .track-meta {
   display: flex;
   gap: 4px;
+  align-items: center;
+}
+
+.track-expand {
+  font-size: 12px;
+  margin-left: 4px;
+  opacity: 0.7;
 }
 
 .track-fx-count,
@@ -722,6 +735,60 @@ body::after {
   font-size: 10px;
   border: 1px solid var(--border-color);
   padding: 0 4px;
+}
+
+.track-detail {
+  padding: 4px 12px 8px 24px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+}
+
+.track-fx-list,
+.track-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.track-fx-list {
+  margin-bottom: 6px;
+}
+
+.rack-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.rack-label {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rack-delete-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rack-delete-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.rack-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .analyze-btn {

@@ -220,6 +220,91 @@ print(f"FX ${fx_index} on track ${track_index} enabled=${enabled}")
     `);
 }
 
+async function deleteMidiItem({ track_index, item_index }) {
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+track = RPR.GetTrack(0, int(${track_index}))
+item = RPR.GetTrackMediaItem(track, int(${item_index}))
+if item:
+    RPR.DeleteTrackMediaItem(track, item)
+    print(f"Deleted MIDI item ${item_index} from track ${track_index}")
+else:
+    raise ValueError(f"No item at index ${item_index} on track ${track_index}")
+    `);
+}
+
+async function removeFx({ track_index, fx_index }) {
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+track = RPR.GetTrack(0, int(${track_index}))
+RPR.TrackFX_Remove(track, int(${fx_index}))
+print(f"Removed FX ${fx_index} from track ${track_index}")
+    `);
+}
+
+async function createFourOnTheFloorPattern({ file_url, track_name = 'Kick Pattern', num_bars = 4, position = 0 }) {
+    const dlRes = await fetch(`${BRIDGE_URL}/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            url: file_url,
+            filename: file_url.split('/').pop().split('?')[0],
+        }),
+    });
+    const dl = await dlRes.json();
+    if (!dl.success || !dl.path) {
+        return { success: false, error: dl.error || 'Download failed' };
+    }
+
+    const name = track_name;
+    const bars = Math.max(1, Math.min(32, parseInt(num_bars, 10) || 4));
+    const pos = parseFloat(position) || 0;
+
+    return runCode(`
+import reapy
+RPR = reapy.reascript_api
+path = ${JSON.stringify(dl.path)}
+track_name = ${JSON.stringify(name)}
+num_bars = ${bars}
+start_pos = ${pos}
+
+# Create new track at end
+n = RPR.CountTracks(0)
+RPR.InsertTrackAtIndex(n, True)
+track = RPR.GetTrack(0, n)
+RPR.GetSetMediaTrackInfo_String(track, "P_NAME", track_name, True)
+
+# Create source from file
+src = RPR.PCM_Source_CreateFromFile(path)
+if not src:
+    raise RuntimeError("Could not load audio file")
+
+lengthResult = RPR.GetMediaSourceLength(src, False)
+item_length = lengthResult[0] if isinstance(lengthResult, (list, tuple)) else lengthResult
+
+# 4-on-the-floor: beats 0,1,2,3 per bar
+beats = []
+for bar in range(num_bars):
+    for beat in range(4):
+        beats.append(bar * 4 + beat)
+
+# Place item at each beat
+for beat in beats:
+    t_sec = float(RPR.TimeMap2_QNToTime(0, start_pos + beat))
+    item = RPR.AddMediaItemToTrack(track)
+    RPR.SetMediaItemPosition(item, t_sec, False)
+    RPR.SetMediaItemLength(item, item_length, False)
+    take = RPR.AddTakeToMediaItem(item)
+    RPR.SetMediaItemTake_Source(take, src)
+    RPR.SetActiveTake(take)
+
+RPR.UpdateArrange()
+print(f"Created 4-on-the-floor pattern: {len(beats)} hits over {num_bars} bars on track '{track_name}'")
+`, 90000);
+}
+
 async function play() {
     return runCode(`
 import reapy
@@ -455,6 +540,9 @@ const TOOL_DISPATCH = {
     list_fx_params: listFxParams,
     load_fx_preset: loadFxPreset,
     toggle_fx: toggleFx,
+    delete_midi_item: deleteMidiItem,
+    remove_fx: removeFx,
+    create_four_on_the_floor_pattern: createFourOnTheFloorPattern,
     play,
     stop,
     set_cursor_position: setCursorPosition,
@@ -699,6 +787,53 @@ const TOOL_SCHEMAS = [
     {
         type: 'function',
         function: {
+            name: 'delete_midi_item',
+            description: 'Delete a MIDI item from a track by item index (0-based).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer', description: 'Track index (0-based)' },
+                    item_index: { type: 'integer', description: 'Item index on the track (0-based)' },
+                },
+                required: ['track_index', 'item_index'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'remove_fx',
+            description: 'Remove an FX plugin (e.g. Serum, ReaEQ) from a track. Use project state to get track_index and fx_index from the track\'s fx array.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    track_index: { type: 'integer', description: 'Track index (0-based)' },
+                    fx_index: { type: 'integer', description: 'FX index on the track (0-based)' },
+                },
+                required: ['track_index', 'fx_index'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'create_four_on_the_floor_pattern',
+            description: 'Create a new track with a 4-on-the-floor kick/sample pattern. Downloads the audio, creates a dedicated track, and places the sample on beats 0,1,2,3 of each bar. Use when user asks for "four on the floor" or "4-on-the-floor" kick pattern.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    file_url: { type: 'string', description: 'URL of the kick/sample audio file (from context files)' },
+                    track_name: { type: 'string', description: 'Name for the new track', default: 'Kick Pattern' },
+                    num_bars: { type: 'integer', description: 'Number of bars (1-32)', default: 4 },
+                    position: { type: 'number', description: 'Start position in beats', default: 0 },
+                },
+                required: ['file_url'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
             name: 'play',
             description: 'Start REAPER playback.',
             parameters: { type: 'object', properties: {} },
@@ -730,7 +865,7 @@ const TOOL_SCHEMAS = [
         type: 'function',
         function: {
             name: 'insert_media_to_track',
-            description: 'Insert an audio file as a media item on the timeline (visible waveform). Use for stems, imported files, etc. Creates a track if track_index is -1.',
+            description: 'Insert an audio file as a media item on the timeline. ALWAYS use track_index=-1 to create a NEW dedicated track — never add to an existing instrument track. Use for stems, imported samples, kick, etc.',
             parameters: {
                 type: 'object',
                 properties: {
