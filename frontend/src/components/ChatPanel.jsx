@@ -201,7 +201,7 @@ export default function ChatPanel({ contextFiles, projectState, onAnalyze }) {
                         onChange={(e) => setModelSystem(e.target.value)}
                         style={{
                             background: '#1a1a1a',
-                            color: '#00ff9d',
+                            color: '#e266efff',
                             border: '1px solid #333',
                             borderRadius: '4px',
                             padding: '4px 6px',
