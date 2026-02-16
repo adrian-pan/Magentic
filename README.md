@@ -6,6 +6,7 @@
 
 <p align="center">
   AI-powered music production assistant for REAPER
+  <img src="frontend/public/UI demo.png" alt="Magentic UI" width="700" />
 </p>
 
 ---
