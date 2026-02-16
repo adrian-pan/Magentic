@@ -5,9 +5,16 @@
 <h1 align="center">Magentic</h1>
 
 <p align="center">
-  AI-powered music production assistant for REAPER
-  <img src="frontend/public/UI demo.png" alt="Magentic UI" width="700" />
+  <em>AI-powered music production assistant for REAPER</em>
 </p>
+
+<br />
+
+<p align="center">
+  <img src="frontend/public/UI demo.png" alt="Magentic UI" width="820" />
+</p>
+
+<br />
 
 ---
 
