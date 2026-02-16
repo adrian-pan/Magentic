@@ -70,11 +70,15 @@ function cleanupTemp(dir) {
 
 function getSongNameFromUrl(url) {
     try {
-        const urlPath = new URL(url).pathname;
+        const urlPath = decodeURIComponent(new URL(url).pathname);
         const segments = urlPath.split('/').filter(Boolean);
         const last = segments[segments.length - 1] || '';
-        const stem = last.replace(/\.[^/.]+$/, '');
-        return (segments.length > 1 ? segments[segments.length - 2] : stem).replace(/[^a-zA-Z0-9_-]/g, '_');
+        // Remove file extension
+        let stem = last.replace(/\.[^/.]+$/, '');
+        // Strip timestamp prefix added during upload (e.g. "1707123456789-")
+        stem = stem.replace(/^\d{10,15}-/, '');
+        // Sanitize
+        return (stem || 'output').replace(/[^a-zA-Z0-9_-]/g, '_');
     } catch {
         return 'output';
     }
@@ -105,14 +109,16 @@ async function callRunPod(action, inputUrl, extraInput = {}) {
 
 async function callModal(endpoint, body) {
     const url = `${FUNCTIONS_MODAL_URL.replace(/\/$/, '')}/${endpoint}`;
+    console.log(`[callModal] POST ${url}`, JSON.stringify(body).slice(0, 200));
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     });
     if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Modal functions error ${res.status}: ${err}`);
+        const errBody = await res.text();
+        console.error(`[callModal] ${endpoint} failed ${res.status}:`, errBody.slice(0, 500));
+        throw new Error(`Modal ${endpoint} error ${res.status}: ${errBody.slice(0, 300)}`);
     }
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -137,8 +143,42 @@ router.post('/separate-stems', express.json(), async (req, res) => {
 
         let stems;
         if (USE_MODAL) {
+            // Modal can't reach localhost — re-upload to Supabase first
+            let modalUrl = url;
+            if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(url)) {
+                console.log('[separate-stems] localhost URL detected — re-uploading to Supabase for Modal access');
+                let localBuf;
+                try {
+                    const localRes = await fetch(url);
+                    if (!localRes.ok) throw new Error(`${localRes.status}`);
+                    localBuf = await localRes.arrayBuffer();
+                } catch (fetchErr) {
+                    throw new Error(
+                        `The audio file is stored locally and is no longer available (${fetchErr.message}). ` +
+                        `Please re-upload the file through the Import panel and try again.`
+                    );
+                }
+                const filename = url.split('/').pop().replace(/\?.*$/, '') || 'audio.mp3';
+                const storagePath = `uploads/reupload/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const { url: supaUrl } = await uploadToBucket(storagePath, Buffer.from(localBuf), 'audio/mpeg');
+                modalUrl = supaUrl;
+                console.log(`[separate-stems] Re-uploaded to Supabase: ${modalUrl}`);
+            }
+            // Pre-check: verify the URL is reachable before wasting Modal GPU time
+            try {
+                const headRes = await fetch(modalUrl, { method: 'HEAD' });
+                if (!headRes.ok) {
+                    throw new Error(
+                        `The audio file URL is not reachable (HTTP ${headRes.status}). ` +
+                        `Please re-upload the file and try again. URL: ${modalUrl.slice(0, 120)}`
+                    );
+                }
+            } catch (headErr) {
+                if (headErr.message.includes('not reachable')) throw headErr;
+                console.warn(`[separate-stems] HEAD check failed (${headErr.message}), proceeding anyway...`);
+            }
             const output = await callModal('separate-stems', {
-                input_url: url,
+                input_url: modalUrl,
                 song_name: getSongNameFromUrl(url),
                 supabase_url: process.env.SUPABASE_URL,
                 supabase_service_key: process.env.SUPABASE_SERVICE_KEY,
@@ -206,7 +246,28 @@ router.post('/transcribe-to-midi', express.json(), async (req, res) => {
 
         let buf, midiFilename;
         if (USE_MODAL) {
-            const modalBody = { input_url: url };
+            // Modal can't reach localhost — re-upload to Supabase first
+            let modalUrl = url;
+            if (/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(url)) {
+                console.log('[transcribe-to-midi] localhost URL detected — re-uploading to Supabase for Modal access');
+                let localBuf;
+                try {
+                    const localRes = await fetch(url);
+                    if (!localRes.ok) throw new Error(`${localRes.status}`);
+                    localBuf = await localRes.arrayBuffer();
+                } catch (fetchErr) {
+                    throw new Error(
+                        `The audio file is stored locally and is no longer available (${fetchErr.message}). ` +
+                        `Please re-upload the file through the Import panel and try again.`
+                    );
+                }
+                const filename = url.split('/').pop().replace(/\?.*$/, '') || 'audio.mp3';
+                const storagePath = `uploads/reupload/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const { url: supaUrl } = await uploadToBucket(storagePath, Buffer.from(localBuf), 'audio/mpeg');
+                modalUrl = supaUrl;
+                console.log(`[transcribe-to-midi] Re-uploaded to Supabase: ${modalUrl}`);
+            }
+            const modalBody = { input_url: modalUrl };
             if (onset_threshold != null) modalBody.onset_threshold = onset_threshold;
             if (frame_threshold != null) modalBody.frame_threshold = frame_threshold;
             if (minimum_note_length != null) modalBody.minimum_note_length = minimum_note_length;

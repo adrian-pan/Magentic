@@ -12,6 +12,7 @@ Health:  curl https://kaisunwang--magentic-functions-serve.modal.run/health
 import base64
 import os
 import tempfile
+import traceback
 import urllib.request
 from pathlib import Path
 from typing import Optional
@@ -89,10 +90,21 @@ class TranscribeRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 def _download(url: str, dest: str) -> None:
+    # Reject localhost/private URLs — Modal can't reach the user's machine
+    if any(h in url for h in ("localhost", "127.0.0.1", "0.0.0.0", "192.168.", "10.")):
+        raise RuntimeError(
+            f"Cannot download from local/private URL on Modal: {url}. "
+            "The file must be uploaded to Supabase or another public host first."
+        )
+    print(f"[download] Fetching: {url[:120]}...")
     req = urllib.request.Request(url, headers={"User-Agent": "Magentic-Modal/1.0"})
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        with open(dest, "wb") as f:
-            f.write(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            with open(dest, "wb") as f:
+                f.write(resp.read())
+    except Exception as e:
+        raise RuntimeError(f"Failed to download {url[:120]}: {e}") from e
+    print(f"[download] Saved {os.path.getsize(dest)} bytes to {dest}")
 
 
 def _upload_to_supabase(
@@ -152,7 +164,7 @@ def _load_models():
         if torch.cuda.is_available():
             model.cuda()
         _demucs_model = model
-        print(f"[startup] Demucs htdemucs loaded on {'cuda' if torch.cuda.is_available() else 'cpu'}")
+        print(f"[startup] Demucs htdemucs loaded on {'cuda' if torch.cuda.is_available() else 'cpu'} (float32)")
 
     if _bp_model is None:
         from basic_pitch import ICASSP_2022_MODEL_PATH
@@ -205,13 +217,17 @@ def _separate_stems_fast(input_path: str, output_dir: str) -> dict:
     std = ref.std()
     wav = (wav - mean) / (std + 1e-8)
 
-    # Run model
+    # Run model with autocast for mixed precision (safe with LayerNorm)
     with torch.no_grad():
-        sources = apply_model(model, wav[None].to(device), progress=False)[0]
+        input_wav = wav[None].to(device)
+        if device.type == "cuda":
+            with torch.amp.autocast("cuda", dtype=torch.float16):
+                sources = apply_model(model, input_wav, progress=False)[0]
+        else:
+            sources = apply_model(model, input_wav, progress=False)[0]
 
-    # Denormalize
-    sources = sources * std + mean
-    sources = sources.cpu()
+    # Denormalize (back to float32 for saving)
+    sources = sources.float().cpu() * std + mean
 
     # Save stems as mp3
     out_dir = Path(output_dir)
@@ -281,6 +297,7 @@ def _transcribe_to_midi_fast(
     gpu="A10G",
     timeout=600,
     scaledown_window=600,
+    min_containers=1,       # Always keep 1 warm — eliminates cold starts
 )
 @modal.concurrent(max_inputs=2)
 @modal.asgi_app()
@@ -300,52 +317,79 @@ def serve():
 
     @web_app.post("/separate-stems")
     def separate_stems(req: StemRequest):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            ext = _infer_ext(req.input_url)
-            input_path = os.path.join(tmpdir, f"input{ext}")
-            _download(req.input_url, input_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                ext = _infer_ext(req.input_url)
+                input_path = os.path.join(tmpdir, f"input{ext}")
+                print(f"[separate-stems] Downloading {req.input_url[:120]}...")
+                _download(req.input_url, input_path)
 
-            stems = _separate_stems_fast(input_path, os.path.join(tmpdir, "stems"))
+                print(f"[separate-stems] Running Demucs on {os.path.getsize(input_path)} bytes...")
+                stems = _separate_stems_fast(input_path, os.path.join(tmpdir, "stems"))
 
-            song_name = req.song_name or Path(input_path).stem
-            safe_song = _safe_name(song_name)
+                song_name = req.song_name or Path(input_path).stem
+                safe_song = _safe_name(song_name)
 
-            if req.supabase_url and req.supabase_service_key:
-                stem_urls = {}
+                if req.supabase_url and req.supabase_service_key:
+                    # Parallel uploads — 4 stems at once instead of sequential
+                    import concurrent.futures
+
+                    def _upload_stem(name_fpath):
+                        name, fpath = name_fpath
+                        with open(fpath, "rb") as f:
+                            data = f.read()
+                        storage_path = f"{safe_song}/{name}.mp3"
+                        url = _upload_to_supabase(
+                            req.supabase_url, req.supabase_service_key,
+                            req.bucket, storage_path, data, "audio/mpeg",
+                        )
+                        return name, url
+
+                    stem_urls = {}
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                        futures = pool.map(_upload_stem, stems.items())
+                        for name, url in futures:
+                            stem_urls[name] = url
+                    print(f"[separate-stems] Done — uploaded {len(stem_urls)} stems to Supabase")
+                    return {"stem_urls": stem_urls}
+
+                result = {}
                 for name, fpath in stems.items():
                     with open(fpath, "rb") as f:
-                        data = f.read()
-                    storage_path = f"{safe_song}/{name}.mp3"
-                    stem_urls[name] = _upload_to_supabase(
-                        req.supabase_url, req.supabase_service_key,
-                        req.bucket, storage_path, data, "audio/mpeg",
-                    )
-                return {"stem_urls": stem_urls}
-
-            result = {}
-            for name, fpath in stems.items():
-                with open(fpath, "rb") as f:
-                    result[name] = base64.b64encode(f.read()).decode("utf-8")
-            return {"stems": result}
+                        result[name] = base64.b64encode(f.read()).decode("utf-8")
+                return {"stems": result}
+        except Exception as e:
+            tb = traceback.format_exc()
+            print(f"[separate-stems] ERROR: {e}\n{tb}")
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=500, content={"error": str(e), "traceback": tb})
 
     @web_app.post("/transcribe-to-midi")
     def transcribe_to_midi(req: TranscribeRequest):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            ext = _infer_ext(req.input_url)
-            input_path = os.path.join(tmpdir, f"input{ext}")
-            _download(req.input_url, input_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                ext = _infer_ext(req.input_url)
+                input_path = os.path.join(tmpdir, f"input{ext}")
+                print(f"[transcribe-to-midi] Downloading {req.input_url[:120]}...")
+                _download(req.input_url, input_path)
 
-            midi_path = _transcribe_to_midi_fast(
-                input_path,
-                os.path.join(tmpdir, "midi"),
-                onset_threshold=req.onset_threshold,
-                frame_threshold=req.frame_threshold,
-                minimum_note_length=req.minimum_note_length,
-            )
+                midi_path = _transcribe_to_midi_fast(
+                    input_path,
+                    os.path.join(tmpdir, "midi"),
+                    onset_threshold=req.onset_threshold,
+                    frame_threshold=req.frame_threshold,
+                    minimum_note_length=req.minimum_note_length,
+                )
 
-            with open(midi_path, "rb") as f:
-                midi_b64 = base64.b64encode(f.read()).decode("utf-8")
+                with open(midi_path, "rb") as f:
+                    midi_b64 = base64.b64encode(f.read()).decode("utf-8")
 
-            return {"midi_base64": midi_b64, "filename": os.path.basename(midi_path)}
+                print(f"[transcribe-to-midi] Done — {os.path.basename(midi_path)}")
+                return {"midi_base64": midi_b64, "filename": os.path.basename(midi_path)}
+        except Exception as e:
+            tb = traceback.format_exc()
+            print(f"[transcribe-to-midi] ERROR: {e}\n{tb}")
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=500, content={"error": str(e), "traceback": tb})
 
     return web_app

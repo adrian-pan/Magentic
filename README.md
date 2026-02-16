@@ -1,65 +1,141 @@
-# 🧲 Magentic
+<p align="center">
+  <img src="frontend/public/Magentic Logo.png" alt="Magentic Logo" width="80" />
+</p>
 
-AI-powered music production assistant with REAPER integration.
+<h1 align="center">Magentic</h1>
 
-## Architecture
+<p align="center">
+  AI-powered music production assistant for REAPER
+</p>
+
+---
+
+## Why Magentic?
+
+Music production has a steep learning curve, especially in powerful DAWs like REAPER. Beginners often know what they want to hear — something like a "house beat" — but don't yet know what that means: a four-on-the-floor kick, a clap on 2 and 4, and off-beat hi-hats. And even if they do, they may not know how to build it inside the DAW.
+
+That gap between musical instinct and technical execution is where most people get stuck.
+
+AI coding assistants have transformed software development — not by replacing engineers, but by helping them move faster and learn as they build. Music production hasn't had that kind of support. **We built Magentic to change that.**
+
+### What it does
+
+- **Control REAPER directly** — Create tracks, add MIDI patterns, apply FX chains, adjust mixing parameters, and more — all from natural-language commands executed instantly in your session.
+- **AI Stem Separation + MIDI Conversion** — Upload any track, split it into drums, bass, vocals, and more using **Demucs** (open-source, originally by Meta), then convert those stems to MIDI using **Basic Pitch** (open-source, by Spotify) so you can reuse and reinterpret the original musical ideas directly inside REAPER.
+- **Manage FX presets** — Browse, switch, and apply FX presets on any track through chat.
+- **Stay project-aware** — Magentic reads your live REAPER session (tracks, FX, items, BPM, duration) and gives context-specific responses referencing your actual project state.
+
+---
+
+## Architecture & Workflow
+
+<p align="center">
+  <img src="frontend/public/architecture.png" alt="Magentic Architecture" width="700" />
+</p>
+
+**Frontend** — React + Vite with a custom dark magenta UI, sleek styling, smooth animations, and an intuitive split-panel layout (file upload, project details, and main chat panel).
+
+**Backend** — Node.js + Express API server using OpenAI's **GPT-4o** and Anthropic's **Claude 3.7** with structured function-calling tools — not just prompt engineering, but a full agentic loop. The AI can call **40+ production tools** (create tracks, generate MIDI, apply FX, separate stems, convert audio to MIDI, etc.) and chain them together into multi-step workflows.
+
+**Python Bridge** — A FastAPI-based bridge server connected to REAPER via the **reapy** library. Tool calls are translated into live DAW modifications, giving Magentic real-time read/write access to the full session.
+
+**ML Models (via Modal)** — Two open-source ML models are integrated into the workflow and run on GPU via [Modal](https://modal.com):
+
+| Model | Source | Purpose |
+|-------|--------|---------|
+| **Demucs** (htdemucs) | Meta / Facebook Research | AI-powered source separation — splits any audio track into drums, bass, vocals, and other stems |
+| **Basic Pitch** (ONNX) | Spotify | Audio-to-MIDI transcription — converts audio stems into MIDI note data so users can study and reinterpret musical ideas |
+
+**Reasoning** — An optional reasoning layer using **Qwen 2.5** (served via Modal on A100 GPUs) provides a dedicated planning step for complex, multi-tool production requests before execution.
+
+```
+User ──► React Frontend ──► Express Backend ──► Python Bridge ──► REAPER
+              │                    │
+              │              GPT-4o / Claude 3.7
+              │              (40+ tool schemas)
+              │                    │
+              │              Modal GPU Endpoints
+              │              ├─ Demucs (stem separation)
+              │              ├─ Basic Pitch (audio → MIDI)
+              │              └─ Qwen 2.5 (reasoning)
+              │                    │
+              └────────────────────┘
+                   responses + tool results
+```
+
+---
+
+## Project Structure
 
 ```
 Magentic/
-├── bridge/           Python FastAPI (REAPER via reapy) — port 5001
-│   ├── main.py
-│   └── requirements.txt
-├── backend/          Express + OpenAI — port 3001
+├── bridge/              Python FastAPI bridge (REAPER via reapy) — port 5001
+│   └── main.py
+├── backend/             Express + OpenAI/Anthropic API — port 3001
 │   ├── server.js
-│   ├── agent/            ← AI system prompt
-│   ├── functions/        ← stem separation + audio-to-MIDI
-│   └── routes/
-└── frontend/         React (Vite) — port 5173
+│   ├── agent/           AI system prompt, tools, Anthropic client
+│   ├── orchestrator/    Intent routing (direct vs. plan)
+│   ├── musicPlan/       Reasoning model planner client
+│   ├── routes/          API routes (chat, files, functions)
+│   └── lib/             Supabase client, file store, music theory
+├── planner/             Modal serverless functions
+│   ├── modal_planner.py     Qwen 2.5 reasoning model
+│   └── modal_functions.py   Demucs + Basic Pitch GPU endpoints
+└── frontend/            React (Vite) — port 5173
     └── src/
 ```
 
-## Setup
+---
+
+## Installation
+
+### Prerequisites
+
+- [REAPER](https://www.reaper.fm/) installed and open
+- [reapy](https://github.com/RomeoDespworktrees/reapy) configured (Python REAPER API)
+- Node.js 18+
+- Python 3.10+
+- An OpenAI API key (required)
+- An Anthropic API key (optional, used as fallback when OpenAI rate-limits)
+- A Supabase project with a `magentic-files` storage bucket (for persistent file/stem/MIDI storage)
 
 ### 1. Bridge (REAPER control)
 
-**Requires:** REAPER open, reapy configured.
+The bridge is a FastAPI server that connects to REAPER via reapy. It must be running for any DAW interaction to work.
 
 ```bash
 cd bridge
-pip install -r requirements.txt
+pip install fastapi uvicorn python-reapy pydantic
 python main.py
 ```
 
-## Live Voice FX Control (v1)
-
-Live mode can **only bypass/enable FX** on a single designated REAPER track named **`BOT_FX`**.
-
-**Project setup:**
-- Create track `VOICE_IN`
-  - **Record armed**
-  - **Input monitoring ON**
-  - Input set to your mic
-- Create track `BOT_FX`
-  - Add a **send from `VOICE_IN` → `BOT_FX`**
-  - Turn **`VOICE_IN` master send OFF**
-  - **Preload FX on `BOT_FX`** (Valhalla, etc.) and **bypass them by default**
-  - Keep **`BOT_FX` master send ON**
-
-**What the bot can do in v1:**
-- `get_botfx_state` — list FX + enabled state on `BOT_FX`
-- `toggle_botfx_by_name` — enable/disable the first matching FX by name substring
-- `panic_botfx` — bypass all FX on `BOT_FX`
+> The bridge starts on port **5001**. Make sure REAPER is open before starting it. If you see `reapy` connection errors, run `python -c "import reapy; reapy.configure_reaper()"` first to enable the REAPER API.
 
 ### 2. Backend
 
 ```bash
 cd backend
-cp .env.example .env       # add OPENAI_API_KEY, optionally SUPABASE_URL + SUPABASE_SERVICE_KEY
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-**File storage:** Without Supabase, uploads use local disk. For persistent storage (bucket for stems, MIDI), create a Supabase project, add a Storage bucket `magentic-files`, and set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` in `.env`.
+Edit `.env` with your keys:
+
+```env
+OPENAI_API_KEY=sk-your-key
+ANTHROPIC_API_KEY=sk-ant-your-key          # optional — Claude fallback
+
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key
+
+# ML Functions (see Limitations below)
+FUNCTIONS_PROVIDER=modal
+FUNCTIONS_MODAL_URL=https://your-modal-url.modal.run
+
+# Reasoning model
+REASONING_PROVIDER=openai                  # or 'modal' for Qwen 2.5
+```
 
 ### 3. Frontend
 
@@ -69,17 +145,32 @@ npm install
 npm run dev
 ```
 
-**Start order:** Bridge → Backend → Frontend. (Bridge only needed for REAPER features.)
+### Start order
 
-Open **http://localhost:5173** — chatbot on the right, import module on the left.
+```
+1. Open REAPER
+2. bridge/    →  python main.py
+3. backend/   →  npm run dev
+4. frontend/  →  npm run dev
+```
 
-### Agent execution
+Open **http://localhost:5173** — chatbot on the right, import panel and project state on the left.
 
-When you ask for REAPER actions (e.g. "Create a track", "Add a drum beat"), the backend runs the Python orchestrator (`agents/`), which executes in REAPER via the bridge. The agent responds with a summary of what it did. Ensure REAPER is open and the bridge is running for execution to work.
+---
 
-### Audio functions (stem separation, MIDI transcription)
+## Current Limitations
 
-- **POST /api/functions/separate-stems** — body: `{ "url": "..." }` (audio file URL)
-- **POST /api/functions/transcribe-to-midi** — body: `{ "url": "..." }` (audio file URL)
+1. **Reasoning model** — The Qwen 2.5 reasoning model (served via Modal) does not yet produce reliable enough plans for complex multi-step production tasks. For now, the system defaults to OpenAI (`gpt-4o`) for both direct execution and planning.
 
-Upload a file via the Import Module, then call these endpoints with the file's `url`. Outputs are stored in Supabase (or returned as local paths if Supabase is not configured).
+2. **Modal GPU endpoints disabled** — As of February 16, 2026, the Modal GPU endpoints for Demucs (stem separation), Basic Pitch (audio-to-MIDI), and QWEN (planning) have been disabled. Users will **not** be able to run stem separation or audio-to-MIDI conversion until the endpoints are re-deployed. To re-enable, deploy the Modal functions:
+
+   ```bash
+   cd planner
+   modal deploy modal_functions.py
+   ```
+
+   Then set `FUNCTIONS_MODAL_URL` in `backend/.env` to the deployed URL.
+
+---
+
+

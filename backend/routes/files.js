@@ -72,13 +72,32 @@ router.post('/upload', (req, res, next) => {
                 const result = await uploadToBucket(storagePath, req.file.buffer, req.file.mimetype);
                 url = result.url;
             } catch (supabaseErr) {
-                console.warn('Supabase upload failed, falling back to disk:', supabaseErr.message);
+                console.warn('Supabase upload failed:', supabaseErr.message);
                 console.warn('→ Use the service_role key (not anon) in SUPABASE_SERVICE_KEY. Supabase Dashboard → Project Settings → API.');
-                if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-                const diskFilename = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-                storagePath = path.join(UPLOAD_DIR, diskFilename);
-                fs.writeFileSync(storagePath, req.file.buffer);
-                url = `${API_BASE}/api/files/download/${diskFilename}`;
+                // When using Modal for ML functions, we MUST have a public URL —
+                // localhost fallback won't work. Retry once before falling back.
+                const useModal = process.env.FUNCTIONS_PROVIDER === 'modal' && !!process.env.FUNCTIONS_MODAL_URL;
+                if (useModal) {
+                    console.warn('[upload] Modal provider requires Supabase — retrying upload once...');
+                    try {
+                        const result = await uploadToBucket(storagePath, req.file.buffer, req.file.mimetype);
+                        url = result.url;
+                    } catch (retryErr) {
+                        console.error('[upload] Supabase retry also failed:', retryErr.message);
+                        // Still fall back to disk but warn loudly
+                        if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+                        const diskFilename = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                        storagePath = path.join(UPLOAD_DIR, diskFilename);
+                        fs.writeFileSync(storagePath, req.file.buffer);
+                        url = `${API_BASE}/api/files/download/${diskFilename}`;
+                    }
+                } else {
+                    if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+                    const diskFilename = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                    storagePath = path.join(UPLOAD_DIR, diskFilename);
+                    fs.writeFileSync(storagePath, req.file.buffer);
+                    url = `${API_BASE}/api/files/download/${diskFilename}`;
+                }
             }
             if (isTextType(type)) {
                 try {

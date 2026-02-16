@@ -15,38 +15,27 @@
 const OpenAI = require('openai');
 const { SYSTEM_PROMPT } = require('../agent/systemPrompt');
 const { TOOL_SCHEMAS, TOOL_DISPATCH } = require('../agent/tools');
+const { runClaudeConversation } = require('../agent/anthropicClient');
 const fileStore = require('../lib/fileStore');
 const { ensureProjectState, invalidateCache } = require('./projectCache');
 
 const MAX_TOOL_ROUNDS = 10;
+const HAS_ANTHROPIC = !!process.env.ANTHROPIC_API_KEY;
 
 /**
- * Execute a "direct" intent via gpt-4o tool-calling (no planner).
- *
- * @param {object} opts
- * @param {string} opts.userText
- * @param {Array} opts.messages - Full conversation messages
- * @param {Array} [opts.contextFiles]
- * @returns {Promise<{ message: object, toolResults?: object[], usage?: object }>}
+ * Build context block (project state + context files) for system prompt.
  */
-async function directExecute({ userText, messages, contextFiles }) {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    // Build system message with optional context
+async function buildContextBlock(contextFiles) {
     let contextBlock = '';
 
-    // Always fetch project state — the model needs context about existing
-    // tracks, FX, and items to make good decisions (reuse vs create, ask
-    // for samples, revision cleanup, etc.). Cache makes this cheap (~50ms).
-    {
-        const projectState = await ensureProjectState({ needed: true });
-        if (projectState) {
-            contextBlock += '\n\n## Current REAPER Project State\n';
-            contextBlock += '```json\n' + JSON.stringify(projectState, null, 2) + '\n```\n';
-            contextBlock += '\nUse this project state to give specific, context-aware advice. Reference track names, FX, and values directly.';
-        } else {
-            contextBlock += '\n\n> Note: Could not read REAPER project state. Bridge may not be running or REAPER is not open.';
-        }
+    const projectState = await ensureProjectState({ needed: true });
+    if (projectState) {
+        // Compact JSON to reduce token usage (~40% fewer tokens than pretty-printed)
+        contextBlock += '\n\n## Current REAPER Project State\n';
+        contextBlock += '```json\n' + JSON.stringify(projectState) + '\n```\n';
+        contextBlock += '\nUse this project state to give specific, context-aware advice. Reference track names, FX, and values directly.';
+    } else {
+        contextBlock += '\n\n> Note: Could not read REAPER project state. Bridge may not be running or REAPER is not open.';
     }
 
     if (contextFiles && contextFiles.length > 0) {
@@ -65,6 +54,42 @@ async function directExecute({ userText, messages, contextFiles }) {
         });
     }
 
+    return contextBlock;
+}
+
+/**
+ * Execute via Claude (Anthropic) — used as fallback when OpenAI rate-limits.
+ */
+async function executeViaClaude({ messages, contextFiles, contextBlock }) {
+    console.log('[directExecute] Falling back to Claude (Anthropic)');
+    const systemPrompt = SYSTEM_PROMPT + contextBlock;
+    const result = await runClaudeConversation(messages, systemPrompt, TOOL_SCHEMAS);
+
+    // Invalidate cache if tools were called
+    if (result.toolResults && result.toolResults.length > 0) {
+        invalidateCache();
+    }
+
+    return {
+        message: { role: 'assistant', content: result.content || '' },
+        toolResults: result.toolResults?.length > 0 ? result.toolResults : undefined,
+    };
+}
+
+/**
+ * Execute a "direct" intent via gpt-4o tool-calling (no planner).
+ * Falls back to Claude on OpenAI 429 rate limits.
+ *
+ * @param {object} opts
+ * @param {string} opts.userText
+ * @param {Array} opts.messages - Full conversation messages
+ * @param {Array} [opts.contextFiles]
+ * @returns {Promise<{ message: object, toolResults?: object[], usage?: object }>}
+ */
+async function directExecute({ userText, messages, contextFiles }) {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const contextBlock = await buildContextBlock(contextFiles);
+
     const systemMessage = {
         role: 'system',
         content: SYSTEM_PROMPT + contextBlock,
@@ -77,13 +102,23 @@ async function directExecute({ userText, messages, contextFiles }) {
     while (rounds < MAX_TOOL_ROUNDS) {
         rounds++;
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: conversationMessages,
-            tools: TOOL_SCHEMAS,
-            temperature: 0.7,
-            max_tokens: 4096,
-        });
+        let completion;
+        try {
+            completion = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: conversationMessages,
+                tools: TOOL_SCHEMAS,
+                temperature: 0.7,
+                max_tokens: 4096,
+            });
+        } catch (err) {
+            // On rate limit, fall back to Claude if available
+            if (err.status === 429 && HAS_ANTHROPIC) {
+                console.warn(`[directExecute] OpenAI 429 rate limit — switching to Claude`);
+                return executeViaClaude({ messages, contextFiles, contextBlock });
+            }
+            throw err;
+        }
 
         const choice = completion.choices[0];
         const assistantMsg = choice.message;
