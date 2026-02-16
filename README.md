@@ -11,7 +11,7 @@
 <br />
 
 <p align="center">
-  <img src="frontend/public/Magentic UI.png" alt="Magentic UI" width="820" />
+  <img src="frontend/public/Magentic UI.png" alt="MagenticUI" width="820" />
 </p>
 
 <br />
