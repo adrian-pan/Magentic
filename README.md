@@ -168,7 +168,7 @@ Open **http://localhost:5173** — chatbot on the right, import panel and projec
 
 ## Current Limitations
 
-1. **Reasoning model** — The Qwen 2.5 reasoning model (served via Modal) does not yet produce reliable enough plans for complex multi-step production tasks. For now, the system defaults to OpenAI (`gpt-4o`) for both direct execution and planning.
+1. **Reasoning model** — The Qwen 2.5 reasoning model (originally served via Modal) does not yet produce reliable enough plans for complex multi-step production tasks. In most cases, the system defaults to gpt-4o for both direct execution and planning.
 
 2. **Modal GPU endpoints disabled** — As of February 16, 2026, the Modal GPU endpoints for Demucs (stem separation), Basic Pitch (audio-to-MIDI), and QWEN (planning) have been disabled. Users will **not** be able to run stem separation or audio-to-MIDI conversion until the endpoints are re-deployed. To re-enable, deploy the Modal functions:
 
